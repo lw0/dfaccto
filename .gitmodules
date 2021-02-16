@@ -1,0 +1,3 @@
+[submodule "sub/dfaccto_tpl"]
+	path = sub/dfaccto_tpl
+	url = https://github.com/lw0/dfaccto_tpl
