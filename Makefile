@@ -80,9 +80,10 @@ info:
 $(VENV_DIR): $(INSTALL_DIR)
 	@echo "--- Initialize template toolchain"
 	@python -m venv $(VENV_DIR)
-	@git submodule update $(INSTALL_DIR)
+	@git submodule update --remote $(INSTALL_DIR)
 	@source $(VENV_DIR)/bin/activate; \
 	 cd $(INSTALL_DIR); \
+	 python -m pip install --upgrade pip; \
 	 python -m pip install .
 
 .PHONY: hardware
