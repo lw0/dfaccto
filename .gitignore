@@ -1,3 +1,7 @@
-/venv/
+/.venv/
 /build/
-/hdl/gen/
+/hw/gen/
+/hw/sources.lst
+/wave/
+.ccls-cache/
+.clangd

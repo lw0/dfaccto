@@ -1,0 +1,41 @@
+valA = dfaccto.port("simValA", "wire")
+valB = dfaccto.port("simValB", "wire")
+valC = dfaccto.port("simValC", "wire")
+evtA = dfaccto.port("simEvtA", "event", {autostb=true})
+evtB = dfaccto.port("simEvtB", "event", {autostb=true})
+evtC = dfaccto.port("simEvtC", "event", {autoack=true})
+
+dfaccto.run(function ()
+  dfaccto.waitFor(4)
+  dfaccto.reset(false)
+  print(" Lua: Begin")
+
+  evtC:waitState(false, true)
+
+  print(" Lua: End")
+  dfaccto.waitFor(4)
+  dfaccto.stop()
+end)
+
+dfaccto.run(function()
+  assert(pcall(function()
+    dfaccto.waitReset(false)
+    evtA:waitStb(true, 6)
+    evtB:waitStb(true, 4)
+
+    evtC:waitAck(true)
+    val = evtC:stbData()
+    print(" Lua: evtC got " .. val)
+  end))
+end)
+
+dfaccto.run(function ()
+  assert(pcall(function()
+    dfaccto.waitReset(false)
+    valA:setData(5)
+    valB:setData(9)
+
+    valC:waitChange()
+    print(" Lua: valC is " .. valC:data())
+  end))
+end)
