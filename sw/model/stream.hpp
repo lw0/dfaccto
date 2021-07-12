@@ -8,16 +8,6 @@
 
 namespace sim::model {
 
-class StreamConfig
-{
-public:
-  virtual size_t tSize() const = 0;
-  virtual float tPush() const = 0;
-  virtual float tTake() const = 0;
-  virtual float tLat() const = 0;
-  virtual ChannelFlags tFlag() const = 0;
-};
-
 struct StreamTBeat
 {
   sim::BitVector data; // encodes tdata and tkeep
@@ -29,20 +19,47 @@ struct StreamTBeat
 
 class Stream : public Model
 {
+
+protected:
+  Stream(Environment &       env,
+         const std::string & name,
+         size_t              depth,
+         float               sinkBandwidth,
+         float               sourceBandwidth,
+         float               latency,
+         ChannelFlags        flags,
+         sim::RndSeed        seed);
+
 public:
-  Stream(Environment & env, const std::string & name, const StreamConfig & cfg);
+  Stream(Environment &       env,
+         const std::string & primaryName,
+         const std::string & secondaryName,
+         size_t              depth,
+         float               sinkBandwidth,
+         float               latency,
+         float               sourceBandwidth,
+         bool                sourceFair,
+         bool                sourcePacked,
+         sim::RndSeed        seed);
 
   virtual void tick() override;
+  virtual void reset(sim::RndSeed seed = 0);
 
-  void reset(sim::RndSeed seed = 0);
-
-  inline sim::Channel<StreamTBeat> & tch();
+  inline bool tFree() const;
+  inline bool tPush(StreamTBeat && beat);
+  inline const StreamTBeat * tHead();
+  inline std::optional<StreamTBeat> tTake();
 
   inline void dataBits(size_t bits);
   inline size_t dataBits() const;
+  inline size_t dataBytes() const;
 
   inline void idBits(size_t bits);
   inline size_t idBits() const;
+  inline size_t maxId() const;
+
+  inline void enableSink(bool enabled);
+  inline void enableSource(bool enabled);
 
 private:
   sim::Channel<StreamTBeat> m_tChannel;
@@ -62,20 +79,39 @@ inline StreamTBeat::StreamTBeat(size_t bits, sim::Id id, bool last)
 , last {last}
 { }
 
-inline sim::Channel<StreamTBeat> & Stream::tch()
+inline bool Stream::tFree() const
 {
-  return m_tChannel;
+  return m_tChannel.free();
+}
+
+inline bool Stream::tPush(StreamTBeat && beat)
+{
+  return m_tChannel.push(std::move(beat), beat.last, beat.id);
+}
+
+inline const StreamTBeat * Stream::tHead()
+{
+  return m_tChannel.headArbit();
+}
+
+inline std::optional<StreamTBeat> Stream::tTake()
+{
+  return m_tChannel.takeArbit();
 }
 
 inline void Stream::dataBits(size_t bits)
 {
-  // TODO-lw detect changes
   m_dataBits = bits;
 }
 
 inline size_t Stream::dataBits() const
 {
   return m_dataBits;
+}
+
+inline size_t Stream::dataBytes() const
+{
+  return (m_dataBits - 1) / 8 + 1;
 }
 
 inline void Stream::idBits(size_t bits)
@@ -86,6 +122,21 @@ inline void Stream::idBits(size_t bits)
 inline size_t Stream::idBits() const
 {
   return m_idBits;
+}
+
+inline size_t Stream::maxId() const
+{
+  return (1u << m_idBits) - 1;
+}
+
+inline void Stream::enableSink(bool enabled)
+{
+  m_tChannel.enablePush(enabled);
+}
+
+inline void Stream::enableSource(bool enabled)
+{
+  m_tChannel.enableTake(enabled);
 }
 
 } // namespace sim:model

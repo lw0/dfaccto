@@ -23,8 +23,7 @@ Context::Context(Environment & env)
 
   luaL_openlibs(m_state);
 
-  open_dfaccto(m_state, this);
-  lua_setglobal(m_state, "dfaccto");
+  open(m_state, this);
 }
 
 Context::~Context()

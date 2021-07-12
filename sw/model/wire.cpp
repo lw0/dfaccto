@@ -6,7 +6,6 @@ namespace sim::model {
 Wire::Wire(Environment & env, const std::string & name)
 : Model(env, name)
 , m_data {0}
-, m_dataBits {0}
 , m_matchers {}
 , m_matcherIds {}
 { }
@@ -17,27 +16,34 @@ Wire::~Wire()
 void Wire::tick()
 { }
 
-void Wire::data(sim::Unit data)
+void Wire::changed()
 {
-  if (m_data != data) {
-    m_data = data;
+  emit(SigChanged);
 
-    emit(SigChanged);
-
-    auto begin = m_matchers.lower_bound(data);
-    auto end = m_matchers.upper_bound(data);
-    for (auto it = begin; it != end; ++it) {
-      emit(SigMatch, it->second);
+  auto it = m_matchers.begin();
+  while (it != m_matchers.end()) {
+    if (std::get<0>(*it).equals(m_data)) {
+      emit(SigMatch, std::get<1>(*it));
+      m_matcherIds.free(std::get<1>(*it));
+      it = m_matchers.erase(it);
+    } else {
+      ++it;
     }
-    m_matchers.erase(begin, end);
   }
 }
 
-sim::Signal Wire::sigMatch(sim::Unit data)
+sim::Signal Wire::sigMatch(const sim::BitVector & data)
 {
   sim::SignalParam id = m_matcherIds.alloc();
-  m_matchers.insert({data, id});
+  m_matchers.emplace_back(data, id);
   return signalFor(SigMatch, id);
+}
+
+void Wire::dataBits(size_t bits)
+{
+  if (bits != m_data.bits()) {
+    m_data.resize(bits);
+  }
 }
 
 } // namespace sim::model

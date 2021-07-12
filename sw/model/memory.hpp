@@ -188,16 +188,37 @@ public:
 
   void reset(sim::RndSeed seed = 0);
 
-  inline sim::Channel<MemoryABeat> & awch();
-  inline sim::Channel<MemoryWBeat> & wch();
-  inline sim::Channel<MemoryBBeat> & bch();
-  inline sim::Channel<MemoryABeat> & arch();
-  inline sim::Channel<MemoryRBeat> & rch();
+  inline bool awFree() const;
+  inline bool awPush(MemoryABeat && beat);
+  inline const MemoryABeat * awHead();
+  inline std::optional<MemoryABeat> awTake();
+
+  inline bool wFree() const;
+  inline bool wPush(MemoryWBeat && beat);
+  inline const MemoryWBeat * wHead();
+  inline std::optional<MemoryWBeat> wTake();
+
+  inline bool bFree() const;
+  inline bool bPush(MemoryBBeat && beat);
+  inline const MemoryBBeat * bHead();
+  inline std::optional<MemoryBBeat> bTake();
+
+  inline bool arFree() const;
+  inline bool arPush(MemoryABeat && beat);
+  inline const MemoryABeat * arHead();
+  inline std::optional<MemoryABeat> arTake();
+
+  inline bool rFree() const;
+  inline bool rPush(MemoryRBeat && beat);
+  inline const MemoryRBeat * rHead();
+  inline std::optional<MemoryRBeat> rTake();
 
   inline void dataBits(size_t bits);
   inline size_t dataBits() const;
+
   inline void addrBits(size_t bits);
   inline size_t addrBits() const;
+
   inline void idBits(size_t bits);
   inline size_t idBits() const;
 
@@ -218,61 +239,39 @@ private:
 
 namespace sim::model {
 
-inline sim::Channel<MemoryABeat> & Memory::awch()
-{
-  return m_awChannel;
-}
+inline bool Memory::awFree() const                 { return m_awChannel.free(); }
+inline bool Memory::awPush(MemoryABeat && beat)    { return m_awChannel.push(beat, 0, true); }
+inline const MemoryABeat * Memory::awHead()        { return m_awChannel.head(); }
+inline std::optional<MemoryABeat> Memory::awTake() { return m_awChannel.take(); }
 
-inline sim::Channel<MemoryWBeat> & Memory::wch()
-{
-  return m_wChannel;
-}
+inline bool Memory::wFree() const                  { return m_wChannel.free(); }
+inline bool Memory::wPush(MemoryWBeat && beat)     { return m_wChannel.push(beat, 0, beat.last); }
+inline const MemoryWBeat * Memory::wHead()         { return m_wChannel.head(); }
+inline std::optional<MemoryWBeat> Memory::wTake()  { return m_wChannel.take(); }
 
-inline sim::Channel<MemoryBBeat> & Memory::bch()
-{
-  return m_bChannel;
-}
+inline bool Memory::bFree() const                  { return m_bChannel.free(); }
+inline bool Memory::bPush(MemoryBBeat && beat)     { return m_bChannel.push(beat, 0, true); }
+inline const MemoryBBeat * Memory::bHead()         { return m_bChannel.head(); }
+inline std::optional<MemoryBBeat> Memory::bTake()  { return m_bChannel.take(); }
 
-inline sim::Channel<MemoryABeat> & Memory::arch()
-{
-  return m_arChannel;
-}
+inline bool Memory::arFree() const                 { return m_arChannel.free(); }
+inline bool Memory::arPush(MemoryABeat && beat)    { return m_arChannel.push(beat, 0, true); }
+inline const MemoryABeat * Memory::arHead()        { return m_arChannel.head(); }
+inline std::optional<MemoryABeat> Memory::arTake() { return m_arChannel.take(); }
 
-inline sim::Channel<MemoryRBeat> & Memory::rch()
-{
-  return m_rChannel;
-}
+inline bool Memory::rFree() const                  { return m_rChannel.free(); }
+inline bool Memory::rPush(MemoryRBeat && beat)     { return m_rChannel.push(beat, 0, beat.last); }
+inline const MemoryRBeat * Memory::rHead()         { return m_rChannel.head(); }
+inline std::optional<MemoryRBeat> Memory::rTake()  { return m_rChannel.take(); }
 
-inline void Memory::dataBits(size_t bits)
-{
-  m_dataBits = bits;
-}
+inline void Memory::dataBits(size_t bits)          { m_dataBits = bits; }
+inline size_t Memory::dataBits() const             { return m_dataBits; }
 
-inline size_t Memory::dataBits() const
-{
-  return m_dataBits;
-}
+inline void Memory::addrBits(size_t bits)          { m_addrBits = bits; }
+inline size_t Memory::addrBits() const             { return m_addrBits; }
 
-inline void Memory::addrBits(size_t bits)
-{
-  m_addrBits = bits;
-}
-
-inline size_t Memory::addrBits() const
-{
-  return m_addrBits;
-}
-
-inline void Memory::idBits(size_t bits)
-{
-  m_idBits = bits;
-}
-
-inline size_t Memory::idBits() const
-{
-  return m_idBits;
-}
-
+inline void Memory::idBits(size_t bits)            { m_idBits = bits; }
+inline size_t Memory::idBits() const               { return m_idBits; }
 
 }
 

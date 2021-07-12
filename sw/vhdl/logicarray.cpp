@@ -59,6 +59,7 @@ Unit LogicArray::toUnitV(Unit & rvalid, size_t off, size_t len)
     if (data[pos].isValid()) {
       valid |= mask;
     }
+    mask <<= 1;
   }
   rvalid = valid;
   return value;
@@ -91,7 +92,7 @@ void LogicArray::toBitVector(BitVector & vec)
   for (size_t unit = 0; unit < vec.units(); ++unit) {
     Unit value, valid;
     value = toUnitV(valid, unit * UnitBits, UnitBits);
-    vec.mux(unit, value, valid);
+    vec.unitSet(unit * UnitBits, UnitBits, value, valid);
   }
 }
 
@@ -105,10 +106,35 @@ void LogicArray::toBitVectorValid(BitVector & vec, size_t group)
   }
 }
 
+bool LogicArray::toBitVectorChanged(BitVector & vec)
+{
+  bool changed = false;
+  for (size_t unit = 0; unit < vec.units(); ++unit) {
+    Unit value, valid;
+    value = toUnitV(valid, unit * UnitBits, UnitBits);
+    changed = changed || vec.unitSetChanged(unit * UnitBits, UnitBits, value, valid);
+  }
+  return changed;
+}
+
+bool LogicArray::toBitVectorValidChanged(BitVector & vec, size_t group)
+{
+  bool changed = false;
+  for (size_t bit = 0; bit < size(); ++bit) {
+    size_t pos = downto()? size() - bit - 1 : bit;
+    size_t low = group * bit;
+    size_t high = low + group - 1;
+    changed = changed || vec.fillValidChanged(high, low, data[pos].isSet());
+  }
+  return changed;
+}
+
 void LogicArray::fromBitVector(const BitVector & vec)
 {
   for (size_t unit = 0; unit < vec.units(); ++unit) {
-    fromUnitV(vec.valueAt(unit), vec.validAt(unit), unit * UnitBits, UnitBits);
+    Unit value, valid;
+    vec.unit(unit * UnitBits, UnitBits, value, valid);
+    fromUnitV(value, valid, unit * UnitBits, UnitBits);
   }
 }
 
@@ -116,9 +142,7 @@ void LogicArray::fromBitVectorValid(const BitVector & vec, size_t group)
 {
   for (size_t bit = 0; bit < size(); ++bit) {
     size_t pos = downto()? size() - bit - 1 : bit;
-    size_t low = group * bit;
-    size_t high = low + group - 1;
-    data[pos].set(vec.valid(high, low));
+    data[pos].set(vec.allValid(group * bit, group));
   }
 }
 

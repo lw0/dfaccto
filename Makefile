@@ -22,7 +22,7 @@ HW_BUILD_DIR = $(BUILD_DIR)/hw
 HW_BUILD_SRCS_LIST = $(HW_BUILD_DIR)/sources.lst
 #------------------------------------------------------------------------------
 # Root config file for VHDL source generation (dfaccto_tpl)
-HW_CONFIG = $(HW_CONFIG_DIR)/testbench.py
+HW_CONFIG = $(HW_CONFIG_DIR)/testbench_event.py
 #------------------------------------------------------------------------------
 # Toplevel VHDL Entity
 HW_TOP = Testbench

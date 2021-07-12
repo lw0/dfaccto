@@ -5,11 +5,31 @@
 
 namespace sim::model {
 
+SystemCondition::SystemCondition(System & system, bool state)
+: m_system {system}
+, m_id {m_system.allocCondition()}
+, m_state {state}
+{ }
+
+SystemCondition::~SystemCondition()
+{
+  m_system.freeCondition(m_id);
+}
+
+void SystemCondition::set(bool state)
+{
+  if (m_state != state) {
+    m_state = state;
+    m_system.emitCondition(m_id, state);
+  }
+}
+
 System::System(Environment & env, const std::string & name)
 : Model(env, name)
 , m_ticks {0}
 , m_timers {}
 , m_timerIds {}
+, m_conditionIds {}
 , m_reset {true}
 , m_stop {false}
 , m_idleTimeout {0}

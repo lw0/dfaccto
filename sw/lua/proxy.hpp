@@ -1,19 +1,42 @@
 #pragma once
 
-#include <lua.hpp>
+#include <iostream>
 
-#include "context.hpp"
+#include <lua.hpp>
 
 
 namespace sim::lua {
 
-void open_dfaccto(lua_State * L, Context * context);
+class Context;
 
-void open_wire(lua_State * L);
-void new_wire(lua_State * L, Context * context);
+extern const void * RegKeyPort;
+extern const void * RegKeyCache;
 
-void open_event(lua_State * L);
-void new_event(lua_State * L, Context * context);
+
+void open(lua_State * L, Context * context);
+
+namespace bitv {
+  extern const char * t_bitv;
+  void open(lua_State * L);
+}
+
+namespace sys {
+  void open(lua_State * L, Context * ctx);
+}
+
+namespace wire {
+  void open(lua_State * L, Context * ctx);
+}
+
+namespace event {
+  void open(lua_State * L, Context * ctx);
+}
+
+
+// void open_stream(lua_State * L);
+// void new_stream_source(lua_State * L, Context * context);
+// void new_stream_sink(lua_State * L, Context * context);
+// void new_stream_pass(lua_State * L, Context * context);
 
 // bool new_stream(lua_State * L, Context * context);
 // bool new_memory(lua_State * L, Context * context);
@@ -22,5 +45,16 @@ void new_event(lua_State * L, Context * context);
 // bool new_raw_stream(lua_State * L, Context * context);
 // bool new_raw_master(lua_State * L, Context * context);
 // bool new_raw_slave(lua_State * L, Context * context);
+
+inline void dumpstack(lua_State * L, const char * position)
+{
+  const int count = lua_gettop(L);
+  std::clog << position << " #" << count << " > ";
+  for (int i = 1; i <= count; ++i) {
+    std::clog << luaL_typename(L, i) << " | ";
+  }
+  std::clog << std::endl;
+}
+
 
 } // namespace sim::lua

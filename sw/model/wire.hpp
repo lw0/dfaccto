@@ -1,8 +1,10 @@
 #pragma once
 
-#include <map>
+#include <list>
+#include <tuple>
 #include <string>
 
+#include "../bitvector.hpp"
 #include "../model.hpp"
 #include "../paramallocator.hpp"
 #include "../types.hpp"
@@ -21,19 +23,19 @@ public:
 
   virtual void tick() override;
 
-  inline sim::Unit data();
-  void data(sim::Unit data);
+  inline sim::BitVector & data();
+  void changed();
+
   inline sim::Signal sigChanged() const;
-  sim::Signal sigMatch(sim::Unit data);
+  sim::Signal sigMatch(const sim::BitVector & data);
 
   inline size_t dataBits();
-  inline void dataBits(size_t bits);
+  void dataBits(size_t bits);
 
 private:
-  sim::Unit m_data;
-  size_t m_dataBits;
+  sim::BitVector m_data;
 
-  std::multimap<sim::Unit, sim::SignalParam> m_matchers;
+  std::list<std::tuple<sim::BitVector, sim::SignalParam>> m_matchers;
   sim::ParamAllocator m_matcherIds;
 };
 
@@ -42,7 +44,7 @@ private:
 
 namespace sim::model {
 
-inline sim::Unit Wire::data()
+inline sim::BitVector & Wire::data()
 {
   return m_data;
 }
@@ -54,12 +56,7 @@ Signal Wire::sigChanged() const
 
 inline size_t Wire::dataBits()
 {
-  return m_dataBits;
-}
-
-inline void Wire::dataBits(size_t bits)
-{
-  m_dataBits = bits;
+  return m_data.bits();
 }
 
 } // namespace sim

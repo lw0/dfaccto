@@ -12,25 +12,51 @@ class Event : public sim::Model
 {
 public:
   enum State : std::uint8_t {
-    Idle =   0x00,
-    Stb =    0x01,
-    StbAck = 0x11,
-    Ack =    0x10
+    // Bit Masks:
+    StbState   = 0x10,
+    StbChange  = 0x20,
+    AckState   = 0x40,
+    AckChange  = 0x80,
+    Index      = 0x0f,
+    // Actual States:
+    Idle       =                                               0,
+    StbAssert  =                        StbChange | StbState | 1,
+    AckAssert  = AckChange | AckState |             StbState | 2,
+    StbRelease =             AckState | StbChange            | 3,
+    AckRelease = AckChange |                        StbState | 4,
+    /* State graph:
+     * +----------->Idle<----------+
+     * |             | stb+        |
+     * |             v             |
+     * |         StbAssert         |
+     * |             | ack+        |
+     * |             v             |
+     * |         AckAssert         |
+     * |  !swap & |     | swap &   |
+     * |     stb- |     | ack-     |
+     * |          v     v          |
+     * |  StbRelease   AckRelease  |
+     * |  !swap & |     | swap &   |
+     * |     ack- |     | stb-     |
+     * +----------+     +----------+
+     */
   };
 
 protected:
   static const sim::SignalCode SigEnter = 0x1;
 
 public:
-  Event(Environment & env, const std::string & name, bool autostb, bool autoack);
+  Event(Environment & env, const std::string & name, bool swapRelease);
   virtual ~Event() override;
 
   void reset();
   virtual void tick() override;
 
-  inline sim::Signal sigState(bool stb, bool ack);
-  inline sim::Signal sigCanStb(bool assert);
-  inline sim::Signal sigCanAck(bool assert);
+  inline State state() const;
+  inline sim::Signal sigState(State state) const;
+
+  inline State canStb(bool assert) const;
+  inline State canAck(bool assert) const;
 
   bool stb(bool assert, sim::Unit data = 0);
   inline bool stbSet();
@@ -45,13 +71,13 @@ public:
   inline void ackBits(size_t bits);
 
 private:
-  bool m_autostb;
-  bool m_autoack;
+  bool m_swapRelease;
+  size_t m_stbBits;
+  size_t m_ackBits;
+
   State m_state;
   sim::Unit m_stbData;
-  size_t m_stbBits;
   sim::Unit m_ackData;
-  size_t m_ackBits;
 };
 
 } // namespace sim::model
@@ -59,24 +85,37 @@ private:
 
 namespace sim::model {
 
-inline sim::Signal Event::sigState(bool stb, bool ack)
+inline Event::State Event::state() const
 {
-  return signalFor(SigEnter, stb? (ack? StbAck : Stb) : (ack? Ack : Idle));
+  return m_state;
 }
 
-inline sim::Signal Event::sigCanStb(bool assert)
+inline sim::Signal Event::sigState(State state) const
 {
-  return signalFor(SigEnter, assert? Idle : StbAck);
+  return signalFor(SigEnter, state);
 }
 
-inline sim::Signal Event::sigCanAck(bool assert)
+inline Event::State Event::canStb(bool assert) const
 {
-  return signalFor(SigEnter, assert? Stb : Ack);
+  if (assert) {
+    return Idle;
+  } else {
+    return m_swapRelease? AckRelease : AckAssert;
+  }
+}
+
+inline Event::State Event::canAck(bool assert) const
+{
+  if (assert) {
+    return StbAssert;
+  } else {
+    return m_swapRelease? AckAssert : StbRelease;
+  }
 }
 
 inline bool Event::stbSet()
 {
-  return m_state & Stb;
+  return m_state & StbState;
 }
 
 inline sim::Unit Event::stbData()
@@ -96,7 +135,7 @@ inline void Event::stbBits(size_t bits)
 
 inline bool Event::ackSet()
 {
-  return m_state & Ack;
+  return m_state & AckState;
 }
 
 inline sim::Unit Event::ackData()

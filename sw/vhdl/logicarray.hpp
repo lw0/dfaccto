@@ -24,6 +24,8 @@ public:
 
   void toBitVector(sim::BitVector & vec);
   void toBitVectorValid(sim::BitVector & vec, size_t group = 1);
+  bool toBitVectorChanged(sim::BitVector & vec);
+  bool toBitVectorValidChanged(sim::BitVector & vec, size_t group = 1);
   void fromBitVector(const sim::BitVector & vec);
   void fromBitVectorValid(const sim::BitVector & vec, size_t group = 1);
 };

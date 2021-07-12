@@ -3,15 +3,14 @@
 
 namespace sim::model {
 
-Event::Event(Environment & env, const std::string & name, bool autostb, bool autoack)
+Event::Event(Environment & env, const std::string & name, bool swapRelease)
 : Model(env, name)
-, m_autostb {autostb}
-, m_autoack {autoack}
+, m_swapRelease {swapRelease}
+, m_stbBits {0}
+, m_ackBits {0}
 , m_state {Idle}
 , m_stbData {0}
-, m_stbBits {0}
 , m_ackData {0}
-, m_ackBits {0}
 { }
 
 Event::~Event()
@@ -29,52 +28,39 @@ void Event::tick()
 
 bool Event::stb(bool assert, sim::Unit data)
 {
-  if (assert) {
-    if (m_state != Idle)
-      return false;
-
-    m_stbData = data;
-    m_state = Stb;
-    emit(SigEnter, Stb);
-    return true;
-
-  } else {
-    if (m_state != StbAck)
-      return false;
-
-    m_state = Ack;
-    emit(SigEnter, Ack);
-    if (m_autoack) {
-      m_state = Idle;
-      emit(SigEnter, Idle);
-    }
-    return true;
+  if (m_state != canStb(assert)) {
+    return false;
   }
+
+  if (assert) {
+    m_stbData = data;
+    m_state = StbAssert;
+    emit(SigEnter, m_state);
+  } else if (m_swapRelease) {
+    m_state = Idle;
+  } else {
+    m_state = StbRelease;
+  }
+  emit(SigEnter, m_state);
+  return true;
 }
 
 bool Event::ack(bool assert, sim::Unit data)
 {
-  if (assert) {
-    if (m_state != Stb)
-      return false;
-
-    m_ackData = data;
-    m_state = StbAck;
-    emit(SigEnter, StbAck);
-    if (m_autostb) {
-      m_state = Ack;
-      emit(SigEnter, Ack);
-    }
-    return true;
-
-  } else {
-    if (m_state != Ack)
-      return false;
-
-    m_state = Idle;
-    emit(SigEnter, Idle);
-    return true;
+  if (m_state != canAck(assert)) {
+    return false;
   }
+
+  if (assert) {
+    m_ackData = data;
+    m_state = AckAssert;
+  } else if (m_swapRelease) {
+    m_state = AckRelease;
+  } else {
+    m_state = Idle;
+  }
+  emit(SigEnter, m_state);
+  return true;
 }
 
 } // namespace sim
