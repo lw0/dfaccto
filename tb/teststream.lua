@@ -1,94 +1,109 @@
 require "math"
 require "string"
-require "coroutine"
 
 local seed = math.random(0)
 
-local stmSrc = dfaccto.port("stmSrc",
+local stmSrc = sys.port("stmSrc",
   "StreamSource", { depth = 0,
-                    bufferBandwidth = 1.0,
-                    bufferFair = false,
-                    bufferPacked = false,
+                    bandwidth = 1.0,
                     latency = 0.0,
-                    sourceBandwidth = 1.0,
-                    sourceFair = false,
-                    sourcePacked = false,
+                    fair = true,
+                    packed = false,
                     seed = seed})
-local stmBuf = dfaccto.loop("stmBufIn", "stmBufOut",
-  "StreamPass", { depth = 0,
-                  sinkBandwidth = 1.0,
-                  latency = 0.0,
-                  sourceBandwidth = 1.0,
-                  sourceFair = false,
-                  sourcePacked = false,
+local stmBuf = sys.pass("stmBufIn", "stmBufOut",
+  "StreamPass", { depth = 16,
+                  bandwidthSink = 1.0,
+                  bandwidthSource = 1.0,
+                  latency = 64.0,
+                  fair = true,
+                  packed = true,
                   seed = seed})
-local stmSnk = dfaccto.port("stmSnk",
+local stmSnk = sys.port("stmSnk",
   "StreamSink", { depth = 0,
-                  sinkBandwidth = 1.0,
+                  bandwidth = 1.0,
                   latency = 0.0,
-                  bufferBandwidth = 1.0,
-                  bufferFair = false,
-                  bufferPacked = false,
                   seed = seed})
 
-local countA = 5
-local doneA = dfaccto.condition(false)
+local idA = 2
+local countA = 2
+local sizeA = 16
+local doneA = sys.condition(false)
 
-local countB = 10
-local doneB = dfaccto.condition(false)
+local idB = 3
+local countB = 3
+local sizeB = 16
+local doneB = sys.condition(false)
 
-dfaccto.run(function ()
-  dfaccto.waitFor(4)
-  dfaccto.reset(false)
+sys.run(function ()
+  sys.waitFor(4)
+  sys.reset(false)
   print(" Lua: Begin")
 
   doneA:wait(true)
   doneB:wait(true)
 
   print(" Lua: End")
-  dfaccto.waitFor(4)
-  dfaccto.stop()
+  sys.waitFor(400)
+  sys.stop()
 end)
 
 
-dfaccto.run(function()
-  dfaccto.waitReset(false)
+sys.run(function()
+  sys.waitReset(false)
   local unit = stmSrc:dataBytes()
-  for idx = 0,countA do
-    local size = math.random(unit * 2, unit * 32)
+  local idx
+  for idx = 1,countA do
+    local size = math.random(1, unit * sizeA)
     local data = string.rep("A", size)
-    stmSrc:write(0, data, true)
-    stmSrc:flush()
-    print(" Lua: A Sending packet #"..size)
+    stmSrc:write(idA, bitv.str(data), true)
+    print(" Lua("..sys.ticks()..") A Sending packet #"..(size*8))
+    sys.waitFor(math.random(1, 2*size//unit))
   end
 end)
 
-dfaccto.run(function()
-  dfaccto.waitReset(false)
+sys.run(function()
+  sys.waitReset(false)
   local unit = stmSrc:dataBytes()
-  for idx = 0,countB do
-    local size = math.random(unit * 2, unit * 32)
+  local idx
+  for idx = 1,countB do
+    local size = math.random(1, unit * sizeB)
     local data = string.rep("B", size)
-    stmSrc:write(1, data, true)
-    coroutine.yield()
-    print(" Lua: B Sending packet #"..size)
+    stmSrc:write(idB, bitv.str(data), true)
+    print(" Lua("..sys.ticks()..") B Sending packet #"..(size*8))
+    sys.waitFor(math.random(1, 2*size//unit))
   end
 end)
 
-dfaccto.run(function()
-  dfaccto.waitReset(false)
-  for idx = 0,countA do
-    local data = stmSnk:read(0, "packet")
-    print(" Lua: A Received packet #"..#data)
+sys.run(function()
+  sys.waitReset(false)
+  local cnt = 0
+  while true do
+    local data, last, id = stmSnk:read(idA)
+    if data:bits() > 0 then
+      print(" Lua("..sys.ticks()..") A Received packet ", last, data:bits(), data:toHex())
+      if last then
+        cnt = cnt + 1
+        if cnt >= countA then break end
+      end
+    end
+    sys.next()
   end
   doneA:set(true)
 end)
 
-dfaccto.run(function()
-  dfaccto.waitReset(false)
-  for idx = 0,countB do
-    local data = stmSnk:read(1, "packet")
-    print(" Lua: B Received packet #"..#data)
+sys.run(function()
+  sys.waitReset(false)
+  local cnt = 0
+  while true do
+    local data, last, id = stmSnk:read(idB)
+    if data:bits() > 0 then
+      print(" Lua("..sys.ticks()..") B Received packet ", last, data:bits(), data:toHex())
+      if last then
+        cnt = cnt + 1
+        if cnt >= countB then break end
+      end
+    end
+    sys.next()
   end
   doneB:set(true)
 end)

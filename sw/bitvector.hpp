@@ -5,6 +5,7 @@
 #include <string>
 
 #include "types.hpp"
+#include "vhdl/logicarray.hpp"
 
 
 
@@ -51,7 +52,6 @@ protected:
 public:
 
   BitVector(size_t bits = 0, bool value = false, bool valid = false);
-  BitVector(size_t bits, sim::Unit value, size_t bitPos = 0);
   ~BitVector();
 
   BitVector(const BitVector & other);
@@ -72,10 +72,6 @@ public:
   void unitSetValue(size_t bitPos, size_t bitCount, sim::Unit value);
   void unitSetValid(size_t bitPos, size_t bitCount, sim::Unit valid);
 
-  bool unitSetChanged(size_t bitPos, size_t bitCount, sim::Unit value, sim::Unit valid);
-  bool unitSetValueChanged(size_t bitPos, size_t bitCount, sim::Unit value);
-  bool unitSetValidChanged(size_t bitPos, size_t bitCount, sim::Unit valid);
-
   BitVector slice(size_t bitPos, size_t bitCount) const;
   bool allValid(size_t bitPos, size_t bitCount) const;
   bool anyValid(size_t bitPos, size_t bitCount) const;
@@ -84,11 +80,7 @@ public:
   void setValue(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
   void setValid(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
   void setValidFromValue(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
-
-  bool setChanged(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
-  bool setValueChanged(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
-  bool setValidChanged(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
-  bool setValidFromValueChanged(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+  void setValueFromValid(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
 
   bool equals(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0) const;
   bool equals(const BitVector & other) const;
@@ -97,23 +89,74 @@ public:
   void fillValue(size_t bitPos, size_t bitCount, bool value);
   void fillValid(size_t bitPos, size_t bitCount, bool valid);
 
-  bool fillChanged(size_t bitPos, size_t bitCount, bool value, bool valid = true);
-  bool fillValueChanged(size_t bitPos, size_t bitCount, bool value);
-  bool fillValidChanged(size_t bitPos, size_t bitCount, bool valid);
-
   void append(const BitVector & other);
 
-  void fromString(const std::string & str);
+  void fromLogic(const sim::vhdl::LogicArray * array);
+  void fromLogicValid(const sim::vhdl::LogicArray * array, size_t group = 1);
+  void fromStr(const std::string & str);
   void fromHex(const std::string & str);
   void fromBin(const std::string & str);
 
-  std::string toString();
-  std::string toHex();
-  std::string toBin();
+  void toLogic(sim::vhdl::LogicArray * array, sim::vhdl::Logic::Level invalid = sim::vhdl::Logic::VX) const;
+  void toLogicValid(sim::vhdl::LogicArray * array, size_t group = 1) const;
+  std::string toStr() const;
+  std::string toHex() const;
+  std::string toBin() const;
+
+protected:
+  inline Unit * buffer();
+  inline const Unit * buffer() const;
+
+  friend class BitVectorFlagged;
 
 private:
   size_t m_bits;
   Unit * m_buffer;
+};
+
+class BitVectorFlagged : public BitVector {
+public:
+  BitVectorFlagged(size_t bits = 0, bool value = false, bool valid = false);
+
+  BitVectorFlagged(const BitVectorFlagged & other);
+  BitVectorFlagged(const BitVector & other);
+  BitVectorFlagged(BitVectorFlagged && other);
+  BitVectorFlagged(BitVector && other);
+
+  BitVectorFlagged & operator=(const BitVectorFlagged & other);
+  BitVectorFlagged & operator=(const BitVector & other);
+  BitVectorFlagged & operator=(BitVectorFlagged && other);
+  BitVectorFlagged & operator=(BitVector && other);
+
+  inline bool changed();
+  inline bool changed(bool set);
+
+  void resize(size_t newBits, bool value = false, bool valid = false);
+
+  void unitSet(size_t bitPos, size_t bitCount, sim::Unit value, sim::Unit valid);
+  void unitSetValue(size_t bitPos, size_t bitCount, sim::Unit value);
+  void unitSetValid(size_t bitPos, size_t bitCount, sim::Unit valid);
+
+  void set(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+  void setValue(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+  void setValid(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+  void setValidFromValue(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+  void setValueFromValid(size_t bitPos, size_t bitCount, const BitVector & other, size_t otherPos = 0);
+
+  void fill(size_t bitPos, size_t bitCount, bool value, bool valid = true);
+  void fillValue(size_t bitPos, size_t bitCount, bool value);
+  void fillValid(size_t bitPos, size_t bitCount, bool valid);
+
+  void append(const BitVector & other);
+
+  void fromLogic(const sim::vhdl::LogicArray * array);
+  void fromLogicValid(const sim::vhdl::LogicArray * array, size_t group = 1);
+  void fromStr(const std::string & str);
+  void fromHex(const std::string & str);
+  void fromBin(const std::string & str);
+
+private:
+  bool m_changed;
 };
 
 } // namespace sim
@@ -130,5 +173,28 @@ inline size_t BitVector::units() const
 {
   return UnitCount(m_bits);
 }
+
+inline Unit * BitVector::buffer()
+{
+  return m_buffer;
+}
+
+inline const Unit * BitVector::buffer() const
+{
+  return m_buffer;
+}
+
+inline bool BitVectorFlagged::changed()
+{
+  return m_changed;
+}
+
+inline bool BitVectorFlagged::changed(bool set)
+{
+  bool changed = m_changed;
+  m_changed = set;
+  return changed;
+}
+
 
 } // namespace sim

@@ -16,6 +16,27 @@ Wire::~Wire()
 void Wire::tick()
 { }
 
+void Wire::dataFrom(const sim::vhdl::LogicArray * data)
+{
+  m_data.fromLogic(data); // also updates m_data.bits()
+  if (m_data.changed(false)) {
+    changed();
+  }
+}
+
+void Wire::dataTo(sim::vhdl::LogicArray * data)
+{
+  m_data.resize(data->size());
+  m_data.toLogic(data, sim::vhdl::Logic::VX);
+}
+
+sim::Signal Wire::sigMatch(const sim::BitVector & data)
+{
+  sim::SignalParam id = m_matcherIds.alloc();
+  m_matchers.emplace_back(data, id);
+  return signalFor(SigMatch, id);
+}
+
 void Wire::changed()
 {
   emit(SigChanged);
@@ -32,19 +53,6 @@ void Wire::changed()
   }
 }
 
-sim::Signal Wire::sigMatch(const sim::BitVector & data)
-{
-  sim::SignalParam id = m_matcherIds.alloc();
-  m_matchers.emplace_back(data, id);
-  return signalFor(SigMatch, id);
-}
-
-void Wire::dataBits(size_t bits)
-{
-  if (bits != m_data.bits()) {
-    m_data.resize(bits);
-  }
-}
 
 } // namespace sim::model
 

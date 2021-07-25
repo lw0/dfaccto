@@ -40,6 +40,10 @@ bool arbit(sim::Id & curId, std::map<sim::Id, T> choices, bool fair, std::functi
 
 using Delay = std::uint32_t;
 constexpr Delay DelayMax = std::numeric_limits<Delay>::max();
+inline bool DelayAtOrAfter(Delay time, Delay ref)
+{
+  return (time - ref) <= (DelayMax >> 1);
+}
 
 using Ticks = std::uint64_t;
 constexpr Ticks TicksMax = std::numeric_limits<Ticks>::max();

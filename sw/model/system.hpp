@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -39,6 +41,8 @@ class System : public sim::Model
   static const SignalCode SigEventAssert = 0x4;
   static const SignalCode SigEventRelease = 0x5;
 
+  using TimerElement = std::pair<sim::Ticks, sim::SignalParam>;
+  using TimerQueue = std::priority_queue<TimerElement, std::vector<TimerElement>, std::greater<TimerElement>>;
 public:
   System(Environment & env, const std::string & name);
   virtual ~System() override;
@@ -69,7 +73,7 @@ protected:
 
 private:
   sim::Ticks m_ticks;
-  std::vector<std::pair<sim::Ticks, sim::SignalParam>> m_timers;
+  TimerQueue m_timers;
   sim::ParamAllocator m_timerIds;
 
   sim::ParamAllocator m_conditionIds;

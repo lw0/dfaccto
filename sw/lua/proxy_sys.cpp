@@ -8,7 +8,9 @@ namespace sim::lua::sys {
 
 int f_run(lua_State *);
 int f_port(lua_State *);
+int f_pass(lua_State *);
 int f_ticks(lua_State *);
+int f_next(lua_State *);
 int f_waitFor(lua_State *);
 int f_waitUntil(lua_State *);
 int f_reset(lua_State *);
@@ -20,7 +22,9 @@ int f_condition(lua_State *);
 const luaL_Reg f_sys[] = {
  {"run",       f_run},
  {"port",      f_port},
+ {"pass",      f_pass},
  {"ticks",     f_ticks},
+ {"next",      f_next},
  {"waitFor",   f_waitFor},
  {"waitUntil", f_waitUntil},
  {"reset",     f_reset},
@@ -29,7 +33,6 @@ const luaL_Reg f_sys[] = {
  {"stop",      f_stop},
  {"condition", f_condition},
  {nullptr,     nullptr}};
-
 
 
 int m_gc(lua_State *);
@@ -123,10 +126,11 @@ int f_port(lua_State * L)
     lua_rawget(L, -2);                              // _cache, _ports, _ports[name]
 
     if (lua_isnil(L, -1)) {
-      lua_pushfstring(L, "Unknown port type %s for port %s", lua_tostring(L, ArgType) , lua_tostring(L, ArgName));
+      lua_pushfstring(L, "Unknown port type %s for %s", lua_tostring(L, ArgType) , lua_tostring(L, ArgName));
       return lua_error(L);
     }
 
+    // call port constructor
     lua_pushvalue(L, ArgName);                      // _cache, _ports, _ports[name], name
     lua_pushvalue(L, ArgParams);                    // _cache, _ports, _ports[name], name, params
     lua_call(L, 2, 1);                              // _cache, _ports, port
@@ -140,52 +144,66 @@ int f_port(lua_State * L)
   return 1;
 }
 
-// // dfaccto.loop(priName : string, secName : string, {type : string, params : table}) : userdata(port)
-// int dfaccto_loop(lua_State * L)
-// {
-//   static constexpr int ArgPriName = 1;
-//   static constexpr int ArgSecName = 2;
-//   static constexpr int ArgType = 3;
-//   static constexpr int ArgParams = 4;
+// dfaccto.pass(priName : string, secName : string, {type : string, params : table}) : userdata(port)
+int f_pass(lua_State * L)
+{
+  static constexpr int ArgPriName = 1;
+  static constexpr int ArgSecName = 2;
+  static constexpr int ArgType = 3;
+  static constexpr int ArgParams = 4;
 
-//   Context * context = (Context *)lua_touserdata(L, lua_upvalueindex(1));
+  // _cache is REGISTRY[RegKeyCache] : table{[name] = port_instance}
+  // _passes is REGISTRY[RegKeyPass] : table{[name] = pass_constructor}
 
-//   // read model cache entries
-//   luaL_checkstring(L, ArgPriName);
-//   luaL_checkstring(L, ArgSecName);
-//   lua_rawgetp(L, LUA_REGISTRYINDEX, context);       // _models
-//   lua_pushvalue(L, ArgPriName);                     // _models, priName
-//   lua_rawget(L, -2);                                // _models, _models[priName]
-//   lua_pushvalue(L, ArgSecName);                     // _models, _models[priName], secName
-//   lua_rawget(L, -3);                                // _models, _models[priName], _models[secName]
+  luaL_checkstring(L, ArgPriName);
+  luaL_checkstring(L, ArgSecName);
+  if (lua_isnone(L, ArgType)) {
+    lua_pushnil(L);
+  }
+  if (lua_isnone(L, ArgParams)) {
+    lua_pushnil(L);
+  }
 
-//   if (lua_isnil(L, -2) && lua_isnil(L, -1)) {
-//     lua_pop(L, 2);                                  // _models
+  // read model cache entries
+  lua_rawgetp(L, LUA_REGISTRYINDEX, RegKeyCache);   // _cache
+  lua_pushvalue(L, ArgPriName);                     // _cache, priName
+  lua_rawget(L, -2);                                // _cache, _cache[priName]
+  lua_pushvalue(L, ArgSecName);                     // _cache, _cache[priName], secName
+  lua_rawget(L, -3);                                // _cache, _cache[priName], pass =_cache[secName]
 
-//     // validate constructor arguments
-//     int typeIdx = luaL_checkoption(L, ArgType, nullptr, dfaccto_loop_types);
-//     if (lua_isnoneornil(L, ArgParams)) {
-//       lua_newtable(L);
-//       lua_replace(L, ArgParams);
-//     }
-//     luaL_checktype(L, ArgParams, LUA_TTABLE);
+  if (lua_isnil(L, -2) && lua_isnil(L, -1)) {
+    // no cache entries for both names, construct new
+    lua_pop(L, 2);                                  // _cache
 
-//     dfaccto_loop_constructors[typeIdx](L, context); // _models, model
+    lua_rawgetp(L, LUA_REGISTRYINDEX, RegKeyPass);  // _cache, _passes
+    lua_pushvalue(L, ArgType);                      // _cache, _passes, type
+    lua_rawget(L, -2);                              // _cache, _passes[type]
 
-//     // store model cache entries
-//     lua_pushvalue(L, ArgPriName);                   // _models, model, priName
-//     lua_pushvalue(L, -2);                           // _models, model, priName, model
-//     lua_rawset(L, -4);                              // _models{priName = model}, model
-//     lua_pushvalue(L, ArgSecName);                   // _models{priName = model}, model, secName
-//     lua_pushvalue(L, -2);                           // _models{priName = model}, model, secName, model
-//     lua_rawset(L, -4);                              // _models{priName = model, secName = model}, model
-//   } else if (!lua_rawequal(L, -2, -1)) {
-//     lua_pushstring(L, "at least one of the named ports already exists and both are not equal");
-//     lua_error(L);
-//   }
+    if (lua_isnil(L, -1)) {
+      lua_pushfstring(L, "Unknown pass type %s for %s/%s", lua_tostring(L, ArgType), lua_tostring(L, ArgPriName), lua_tostring(L, ArgSecName));
+      return lua_error(L);
+    }
 
-//   return 1;
-// }
+    // call pass constructor
+    lua_pushvalue(L, ArgPriName);                   // _cache, _passes[type], priName
+    lua_pushvalue(L, ArgSecName);                   // _cache, _passes[type], priName, secName
+    lua_pushvalue(L, ArgParams);                    // _cache, _passes[type], priName, secName, params
+    lua_call(L, 3, 1);                              // _cache, _passes[type], pass
+
+    // store cache entries
+    lua_pushvalue(L, ArgPriName);                   // _cache, _passes[type], pass, priName
+    lua_pushvalue(L, -2);                           // _cache, _passes[type], pass, priName, pass
+    lua_rawset(L, -5);                              // _cache{[priName] = pass}, _passes[type], pass
+    lua_pushvalue(L, ArgSecName);                   // _cache{[priName] = pass}, _passes[type], pass, secName
+    lua_pushvalue(L, -2);                           // _cache{[priName] = pass}, _passes[type], pass, secName, pass
+    lua_rawset(L, -5);                              // _cache{[priName] = pass, [secName] = pass}, _passes[type], pass
+  } else if (!lua_rawequal(L, -2, -1)) {
+    lua_pushstring(L, "at least one of the named ports already exists and both are not equal");
+    return lua_error(L);
+  }
+
+  return 1;
+}
 
 
 // dfaccto.ticks() -> timestamp : integer
@@ -195,6 +213,12 @@ int f_ticks(lua_State * L)
 
   lua_pushinteger(L, sys.ticks());
   return 1;
+}
+
+// dfaccto.next()
+int f_next(lua_State * L)
+{
+  return lua_yield(L, 0);
 }
 
 // dfaccto.waitFor(tick_delay : integer)

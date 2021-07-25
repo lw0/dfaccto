@@ -78,10 +78,8 @@ int m_gc(lua_State * L)
 int m_setData(lua_State *L)
 {
   sim::model::Wire * model = (sim::model::Wire *)luaL_checkudata(L, 1, t_wire);
-  sim::BitVector * bitv = (sim::BitVector *)luaL_checkudata(L, 2, sim::lua::bitv::t_bitv);
-  if (model->data().setChanged(0, bitv->bits(), *bitv)) {
-    model->changed();
-  }
+  sim::BitVector * bitv = sim::lua::bitv::getBitVector(L, 2, model->dataBits());
+  model->data(*bitv);
   return 0;
 }
 //TODO-lw convenience setters according to bitv?
@@ -109,12 +107,7 @@ int m_waitMatch(lua_State *L)
 int m_data(lua_State *L)
 {
   sim::model::Wire * model = (sim::model::Wire *)luaL_checkudata(L, 1, t_wire);
-
-  sim::BitVector * bitv = (sim::BitVector *)lua_newuserdatauv(L, sizeof(sim::BitVector), 0);
-  new (bitv) sim::BitVector(model->data());
-  luaL_getmetatable(L, sim::lua::bitv::t_bitv);
-  lua_setmetatable(L, -2);
-
+  sim::lua::bitv::pushBitVector(L, model->data());
   return 1;
 }
 

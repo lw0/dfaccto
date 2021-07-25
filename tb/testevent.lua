@@ -45,18 +45,18 @@ sys.run(function()
   evtA:stb("release")
 
   local val = evtC:ack("cycle")
-  print(" Lua: evtC sent " .. val)
+  print(" Lua: evtC sent " .. val:toHex())
   finished:set(true)
 end)
 
 sys.run(function ()
   sys.waitReset(false)
   valA:setData(bitv.int(5, 8))
-  valB:setData(bitv.int(9, 8))
+  valB:setData(9)
 
-  print(" Lua: valC is " .. valC:data():toBin())
+  print(" Lua: valC is " .. valC:data():toHex())
   while true do
     valC:waitChange()
-    print(" Lua: valC is " .. valC:data():toBin())
+    print(" Lua: valC is " .. valC:data():toHex())
   end
 end)

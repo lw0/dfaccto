@@ -43,10 +43,10 @@ void System::tick()
 {
   ++m_ticks;
 
-  while (m_timers.size() && m_timers.front().first <= m_ticks) {
-    sim::SignalParam id = m_timers.front().second;
-    std::pop_heap(m_timers.begin(), m_timers.end());
-    m_timers.pop_back();
+  while (!m_timers.empty() && m_timers.top().first <= m_ticks) {
+    sim::Ticks at = m_timers.top().first;
+    sim::SignalParam id = m_timers.top().second;
+    m_timers.pop();
     m_timerIds.free(id);
     emit(SigTimer, id);
   }
@@ -61,8 +61,7 @@ void System::tick()
 Signal System::sigTimer(sim::Ticks at)
 {
   sim::SignalParam id = m_timerIds.alloc();
-  m_timers.emplace_back(at, id);
-  std::push_heap(m_timers.begin(), m_timers.end());
+  m_timers.emplace(at, id);
   return signalFor(SigTimer, id);
 }
 

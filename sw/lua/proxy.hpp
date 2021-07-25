@@ -4,20 +4,26 @@
 
 #include <lua.hpp>
 
+#include "../bitvector.hpp"
+
 
 namespace sim::lua {
 
 class Context;
 
 extern const void * RegKeyPort;
+extern const void * RegKeyPass;
 extern const void * RegKeyCache;
 
 
 void open(lua_State * L, Context * context);
 
 namespace bitv {
-  extern const char * t_bitv;
   void open(lua_State * L);
+  sim::BitVector * pushBitVector(lua_State * L, size_t bits = 0, bool value = false, bool valid = false);
+  sim::BitVector * pushBitVector(lua_State * L, const sim::BitVector & other);
+  sim::BitVector * pushBitVector(lua_State * L, sim::BitVector && other);
+  sim::BitVector * getBitVector(lua_State * L, int pos, size_t defaultBits);
 }
 
 namespace sys {
@@ -32,6 +38,9 @@ namespace event {
   void open(lua_State * L, Context * ctx);
 }
 
+namespace stream {
+  void open(lua_State * L, Context * ctx);
+}
 
 // void open_stream(lua_State * L);
 // void new_stream_source(lua_State * L, Context * context);

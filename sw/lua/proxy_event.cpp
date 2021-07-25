@@ -12,19 +12,19 @@
  * :waitState(state : string {Idle, StbAssert, AckAssert, StbRelease, AckRelease}) !blocking
 
  * :stbSignal() : bool
- * :stbData() : integer
+ * :stbData() : bitv
  * :stbBits() : integer
  * :canStb(mode : string {"assert", "release", "cycle"}) : bool
- * :stb(assert : string {"assert", "release", "cycle"}, data : integer := 0) : integer or nil !blocking
+ * :stb(assert : string {"assert", "release", "cycle"}, data : bitv := nil) : integer or nil !blocking
      stb("assert", stbData)
      stb("release") -> ackData
      stb("cycle", stbData) -> ackData
 
  * :ackSignal() : bool
- * :ackData() : integer
+ * :ackData() : bitv
  * :ackBits() : integer
  * :canAck(mode : string {"assert", "release", "cycle"}) : bool
- * :ack(assert : string {"assert", "release", "cycle"}, data : integer := 0) integer or nil !blocking
+ * :ack(assert : string {"assert", "release", "cycle"}, data : integer := nil) integer or nil !blocking
      ack("assert", ackData) -> stbData
      ack("release")
      ack("cycle", ackData) -> stbData
@@ -184,11 +184,11 @@ int m_stbSignal(lua_State * L)
   return 1;
 }
 
-// :stbData() : integer
+// :stbData() : bitv
 int m_stbData(lua_State * L)
 {
   sim::model::Event * model = (sim::model::Event *)luaL_checkudata(L, 1, t_event);
-  lua_pushinteger(L, model->stbData());
+  sim::lua::bitv::pushBitVector(L, model->stbData());
   return 1;
 }
 
@@ -203,13 +203,13 @@ int m_stbBits(lua_State * L)
 int event_stb_k(lua_State * L, int status, lua_KContext ctx)
 {
   sim::model::Event * model = (sim::model::Event *)luaL_checkudata(L, 1, t_event);
-  lua_Integer data;
 
   switch (ctx) {
   case 0: // "assert"
   case 2: // "cycle" assert phase
-    data = luaL_optinteger(L, 3, 0);
-    if (model->stb(true, data)) {
+    if (model->canStb(true) == model->state()) {
+      sim::BitVector * data = sim::lua::bitv::getBitVector(L, 3, model->stbBits());
+      model->stb(true, *data);
       if (ctx == 0) {
         return 0;
       } else {
@@ -223,8 +223,10 @@ int event_stb_k(lua_State * L, int status, lua_KContext ctx)
 
   case 1: // "release"
   case 3: // "cycle" release phase
-    if (model->stb(false, data)) {
-      lua_pushinteger(L, model->ackData());
+    if (model->canStb(false) == model->state()) {
+      sim::BitVector * data = sim::lua::bitv::getBitVector(L, 3, model->stbBits());
+      model->stb(false, *data);
+      sim::lua::bitv::pushBitVector(L, model->ackData());
       return 1;
     } else {
       lua_pushinteger(L, model->sigState(model->canStb(false)));
@@ -256,7 +258,7 @@ int m_ackSignal(lua_State * L)
 int m_ackData(lua_State * L)
 {
   sim::model::Event * model = (sim::model::Event *)luaL_checkudata(L, 1, t_event);
-  lua_pushinteger(L, model->ackData());
+  sim::lua::bitv::pushBitVector(L, model->ackData());
   return 1;
 }
 
@@ -271,15 +273,15 @@ int m_ackBits(lua_State * L)
 int event_ack_k(lua_State * L, int status, lua_KContext ctx)
 {
   sim::model::Event * model = (sim::model::Event *)luaL_checkudata(L, 1, t_event);
-  lua_Integer data;
 
   switch (ctx) {
   case 0: // "assert"
   case 2: // "cycle" assert phase
-    data = luaL_optinteger(L, 3, 0);
-    if (model->ack(true, data)) {
-      lua_pushinteger(L, model->stbData());
+    if (model->canAck(true) == model->state()) {
+      sim::BitVector * data = sim::lua::bitv::getBitVector(L, 3, model->stbBits());
+      model->ack(true, *data);
       if (ctx == 0) {
+        sim::lua::bitv::pushBitVector(L, model->stbData());
         return 1;
       } else {
         // continue with release phase in next cycle
@@ -292,11 +294,13 @@ int event_ack_k(lua_State * L, int status, lua_KContext ctx)
 
   case 1: // "release"
   case 3: // "cycle" release phase
-    if (model->ack(false, data)) {
+    if (model->canAck(false) == model->state()) {
+      sim::BitVector * data = sim::lua::bitv::getBitVector(L, 3, model->stbBits());
+      model->ack(false, *data);
       if (ctx == 1) {
         return 0;
       } else {
-        // return stbData pushed in "cycle" assert phase
+        sim::lua::bitv::pushBitVector(L, model->stbData());
         return 1;
       }
     } else {

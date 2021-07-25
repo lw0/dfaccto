@@ -4,6 +4,8 @@
 
 #include "../types.hpp"
 #include "../model.hpp"
+#include "../bitvector.hpp"
+#include "../vhdl/logicarray.hpp"
 
 
 namespace sim::model {
@@ -52,32 +54,37 @@ public:
   void reset();
   virtual void tick() override;
 
+  void stbFrom(sim::vhdl::Logic stb, const sim::vhdl::LogicArray * stbData);
+  void stbTo(sim::vhdl::Logic * stb, sim::vhdl::LogicArray * stbData);
+  void ackFrom(sim::vhdl::Logic ack, const sim::vhdl::LogicArray * ackData);
+  void ackTo(sim::vhdl::Logic * ack, sim::vhdl::LogicArray * ackData);
+
   inline State state() const;
   inline sim::Signal sigState(State state) const;
 
   inline State canStb(bool assert) const;
   inline State canAck(bool assert) const;
 
-  bool stb(bool assert, sim::Unit data = 0);
-  inline bool stbSet();
-  inline sim::Unit stbData();
-  inline size_t stbBits();
-  inline void stbBits(size_t bits);
+  inline void stb(bool assert, const sim::BitVector & stbData);
+  inline bool stbSet() const;
+  inline const sim::BitVector & stbData() const;
+  inline size_t stbBits() const;
 
-  bool ack(bool assert, sim::Unit data = 0);
-  inline bool ackSet();
-  inline sim::Unit ackData();
-  inline size_t ackBits();
-  inline void ackBits(size_t bits);
+  inline void ack(bool assert, const sim::BitVector & stbData);
+  inline bool ackSet() const;
+  inline const sim::BitVector & ackData() const;
+  inline size_t ackBits() const;
+
+protected:
+  bool doStb(bool assert);
+  bool doAck(bool assert);
 
 private:
   bool m_swapRelease;
-  size_t m_stbBits;
-  size_t m_ackBits;
 
   State m_state;
-  sim::Unit m_stbData;
-  sim::Unit m_ackData;
+  sim::BitVector m_stbData;
+  sim::BitVector m_ackData;
 };
 
 } // namespace sim::model
@@ -113,44 +120,48 @@ inline Event::State Event::canAck(bool assert) const
   }
 }
 
-inline bool Event::stbSet()
+inline void Event::stb(bool assert, const sim::BitVector & stbData)
+{
+  if (doStb(assert)) {
+    m_stbData.set(0, m_stbData.bits(), stbData);
+  }
+}
+
+inline bool Event::stbSet() const
 {
   return m_state & StbState;
 }
 
-inline sim::Unit Event::stbData()
+inline const sim::BitVector & Event::stbData() const
 {
   return m_stbData;
 }
 
-inline size_t Event::stbBits()
+inline size_t Event::stbBits() const
 {
-  return m_stbBits;
+  return m_stbData.bits();
 }
 
-inline void Event::stbBits(size_t bits)
+inline void Event::ack(bool assert, const sim::BitVector & ackData)
 {
-  m_stbBits = bits;
+  if (doAck(assert)) {
+    m_ackData.set(0, m_ackData.bits(), ackData);
+  }
 }
 
-inline bool Event::ackSet()
+inline bool Event::ackSet() const
 {
   return m_state & AckState;
 }
 
-inline sim::Unit Event::ackData()
+inline const sim::BitVector & Event::ackData() const
 {
   return m_ackData;
 }
 
-inline size_t Event::ackBits()
+inline size_t Event::ackBits() const
 {
-  return m_ackBits;
-}
-
-inline void Event::ackBits(size_t bits)
-{
-  m_ackBits = bits;
+  return m_ackData.bits();
 }
 
 } // namespace sim::model

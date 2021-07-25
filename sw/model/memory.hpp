@@ -135,11 +135,11 @@ struct MemoryABeat
   MemoryBurstInfo info;
   sim::Id id;
 
-  inline MemoryABeat(MemoryAddr addr, MemoryLen len, MemorySize size, MemoryBurst burst, sim::Id id)
-  : addr {addr}
-  , info {len, size, burst}
-  , id {id}
-  { }
+  // inline MemoryABeat(MemoryAddr addr, MemoryLen len, MemorySize size, MemoryBurst burst, sim::Id id)
+  // : addr {addr}
+  // , info {len, size, burst}
+  // , id {id}
+  // { }
 };
 
 struct MemoryRBeat
@@ -149,12 +149,12 @@ struct MemoryRBeat
   MemoryResp resp;
   bool last;
 
-  inline MemoryRBeat(std::size_t bits, sim::Id id = 0, MemoryResp resp = RespOk, bool last = false)
-  : data (bits)
-  , id {id}
-  , resp {resp}
-  , last {last}
-  { }
+  // inline MemoryRBeat(std::size_t bits, sim::Id id = 0, MemoryResp resp = RespOk, bool last = false)
+  // : data (bits)
+  // , id {id}
+  // , resp {resp}
+  // , last {last}
+  // { }
 };
 
 struct MemoryWBeat
@@ -162,10 +162,10 @@ struct MemoryWBeat
   sim::BitVector data; // wdata and wstrb
   bool last;
 
-  inline MemoryWBeat(std::size_t bits, bool last = false)
-  : data (bits)
-  , last {last}
-  { }
+  // inline MemoryWBeat(std::size_t bits, bool last = false)
+  // : data (bits)
+  // , last {last}
+  // { }
 };
 
 struct MemoryBBeat
@@ -173,10 +173,10 @@ struct MemoryBBeat
   sim::Id id;
   MemoryResp resp;
 
-  inline MemoryBBeat(sim::Id id = 0, MemoryResp resp = RespOk)
-  : id {id}
-  , resp {resp}
-  { }
+  // inline MemoryBBeat(sim::Id id = 0, MemoryResp resp = RespOk)
+  // : id {id}
+  // , resp {resp}
+  // { }
 };
 
 class Memory : public Model
@@ -188,46 +188,81 @@ public:
 
   void reset(sim::RndSeed seed = 0);
 
-  inline bool awFree() const;
-  inline bool awPush(MemoryABeat && beat);
-  inline const MemoryABeat * awHead();
-  inline std::optional<MemoryABeat> awTake();
+  void awNextFrom(sim::vhdl::Logic v_awready);
+  void awHeadTo(sim::vhdl::LogicArray * v_awaddr,
+                sim::vhdl::LogicArray * v_awlen,
+                sim::vhdl::LogicArray * v_awsize,
+                sim::vhdl::LogicArray * v_awburst,
+                sim::vhdl::LogicArray * v_awid,
+                sim::vhdl::Logic      * v_awvalid);
+  void awPushFrom(sim::vhdl::LogicArray * v_awaddr,
+                  sim::vhdl::LogicArray * v_awlen,
+                  sim::vhdl::LogicArray * v_awsize,
+                  sim::vhdl::LogicArray * v_awburst,
+                  sim::vhdl::LogicArray * v_awid,
+                  sim::vhdl::Logic        v_awvalid);
+  void awFreeTo(sim::vhdl::Logic * v_awready);
 
-  inline bool wFree() const;
-  inline bool wPush(MemoryWBeat && beat);
-  inline const MemoryWBeat * wHead();
-  inline std::optional<MemoryWBeat> wTake();
+  void arNextFrom(sim::vhdl::Logic v_arready);
+  void arHeadTo(sim::vhdl::LogicArray * v_araddr,
+                sim::vhdl::LogicArray * v_arlen,
+                sim::vhdl::LogicArray * v_arsize,
+                sim::vhdl::LogicArray * v_arburst,
+                sim::vhdl::LogicArray * v_arid,
+                sim::vhdl::Logic      * v_arvalid);
+  void arPushFrom(sim::vhdl::LogicArray * v_araddr,
+                  sim::vhdl::LogicArray * v_arlen,
+                  sim::vhdl::LogicArray * v_arsize,
+                  sim::vhdl::LogicArray * v_arburst,
+                  sim::vhdl::LogicArray * v_arid,
+                  sim::vhdl::Logic        v_arvalid);
+  void arFreeTo(sim::vhdl::Logic * v_arready);
 
-  inline bool bFree() const;
-  inline bool bPush(MemoryBBeat && beat);
-  inline const MemoryBBeat * bHead();
-  inline std::optional<MemoryBBeat> bTake();
+  void wNextFrom(sim::vhdl::Logic v_wready);
+  void wHeadTo(sim::vhdl::LogicArray * v_wdata,
+               sim::vhdl::LogicArray * v_wstrb,
+               sim::vhdl::Logic      * v_wlast,
+               sim::vhdl::Logic      * v_wvalid);
+  void wPushFrom(sim::vhdl::LogicArray * v_wdata,
+                 sim::vhdl::LogicArray * v_wstrb,
+                 sim::vhdl::Logic        v_wlast,
+                 sim::vhdl::Logic        v_wvalid);
+  void wFreeTo(sim::vhdl::Logic * v_wready);
 
-  inline bool arFree() const;
-  inline bool arPush(MemoryABeat && beat);
-  inline const MemoryABeat * arHead();
-  inline std::optional<MemoryABeat> arTake();
+  void rNextFrom(sim::vhdl::Logic v_rready);
+  void rHeadTo(sim::vhdl::LogicArray * v_rdata,
+               sim::vhdl::LogicArray * v_rresp,
+               sim::vhdl::Logic      * v_rlast,
+               sim::vhdl::LogicArray * v_rid,
+               sim::vhdl::Logic      * v_rvalid);
+  void rPushFrom(sim::vhdl::LogicArray * v_rdata,
+                 sim::vhdl::LogicArray * v_rresp,
+                 sim::vhdl::Logic        v_rlast,
+                 sim::vhdl::LogicArray * v_rid,
+                 sim::vhdl::Logic        v_rvalid);
+  void rFreeTo(sim::vhdl::Logic * v_rready);
 
-  inline bool rFree() const;
-  inline bool rPush(MemoryRBeat && beat);
-  inline const MemoryRBeat * rHead();
-  inline std::optional<MemoryRBeat> rTake();
+  void bNextFrom(sim::vhdl::Logic v_bready);
+  void bHeadTo(sim::vhdl::LogicArray * v_bresp,
+               sim::vhdl::LogicArray * v_bid,
+               sim::vhdl::Logic      * v_bvalid);
+  void bPushFrom(sim::vhdl::LogicArray * v_bresp,
+                 sim::vhdl::LogicArray * v_bid,
+                 sim::vhdl::Logic        v_bvalid);
+  void bFreeTo(sim::vhdl::Logic * v_bready);
 
-  inline void dataBits(size_t bits);
   inline size_t dataBits() const;
 
-  inline void addrBits(size_t bits);
   inline size_t addrBits() const;
 
-  inline void idBits(size_t bits);
   inline size_t idBits() const;
 
 private:
-  sim::Channel<MemoryABeat> m_awChannel;
-  sim::Channel<MemoryWBeat> m_wChannel;
-  sim::Channel<MemoryBBeat> m_bChannel;
-  sim::Channel<MemoryABeat> m_arChannel;
-  sim::Channel<MemoryRBeat> m_rChannel;
+  sim::SingleChannel<MemoryABeat> m_awChannel;
+  sim::SingleChannel<MemoryWBeat> m_wChannel;
+  sim::SingleChannel<MemoryBBeat> m_bChannel;
+  sim::SingleChannel<MemoryABeat> m_arChannel;
+  sim::SingleChannel<MemoryRBeat> m_rChannel;
 
   size_t m_dataBits;
   size_t m_addrBits;
@@ -239,39 +274,20 @@ private:
 
 namespace sim::model {
 
-inline bool Memory::awFree() const                 { return m_awChannel.free(); }
-inline bool Memory::awPush(MemoryABeat && beat)    { return m_awChannel.push(beat, 0, true); }
-inline const MemoryABeat * Memory::awHead()        { return m_awChannel.head(); }
-inline std::optional<MemoryABeat> Memory::awTake() { return m_awChannel.take(); }
+inline size_t Memory::dataBits() const
+{
+  return m_dataBits;
+}
 
-inline bool Memory::wFree() const                  { return m_wChannel.free(); }
-inline bool Memory::wPush(MemoryWBeat && beat)     { return m_wChannel.push(beat, 0, beat.last); }
-inline const MemoryWBeat * Memory::wHead()         { return m_wChannel.head(); }
-inline std::optional<MemoryWBeat> Memory::wTake()  { return m_wChannel.take(); }
+inline size_t Memory::addrBits() const
+{
+  return m_addrBits;
+}
 
-inline bool Memory::bFree() const                  { return m_bChannel.free(); }
-inline bool Memory::bPush(MemoryBBeat && beat)     { return m_bChannel.push(beat, 0, true); }
-inline const MemoryBBeat * Memory::bHead()         { return m_bChannel.head(); }
-inline std::optional<MemoryBBeat> Memory::bTake()  { return m_bChannel.take(); }
-
-inline bool Memory::arFree() const                 { return m_arChannel.free(); }
-inline bool Memory::arPush(MemoryABeat && beat)    { return m_arChannel.push(beat, 0, true); }
-inline const MemoryABeat * Memory::arHead()        { return m_arChannel.head(); }
-inline std::optional<MemoryABeat> Memory::arTake() { return m_arChannel.take(); }
-
-inline bool Memory::rFree() const                  { return m_rChannel.free(); }
-inline bool Memory::rPush(MemoryRBeat && beat)     { return m_rChannel.push(beat, 0, beat.last); }
-inline const MemoryRBeat * Memory::rHead()         { return m_rChannel.head(); }
-inline std::optional<MemoryRBeat> Memory::rTake()  { return m_rChannel.take(); }
-
-inline void Memory::dataBits(size_t bits)          { m_dataBits = bits; }
-inline size_t Memory::dataBits() const             { return m_dataBits; }
-
-inline void Memory::addrBits(size_t bits)          { m_addrBits = bits; }
-inline size_t Memory::addrBits() const             { return m_addrBits; }
-
-inline void Memory::idBits(size_t bits)            { m_idBits = bits; }
-inline size_t Memory::idBits() const               { return m_idBits; }
+inline size_t Memory::idBits() const
+{
+  return m_idBits;
+}
 
 }
 

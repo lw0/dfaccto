@@ -48,10 +48,10 @@ void Logic::set(bool state)
   value = state? V1 : V0;
 }
 
-void Logic::setX(bool state, bool valid)
+void Logic::setV(bool state, bool valid, Level invvalue)
 {
   if (!valid) {
-    value = VX;
+    value = invvalue;
   } else {
     value = state? V1 : V0;
   }

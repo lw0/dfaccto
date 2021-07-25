@@ -16,7 +16,7 @@ extern "C" {
 
 void x_setup(sim::vhdl::String * v_config)
 {
-  g_env.onSetup(v_config->toString(), 64);
+  g_env.onSetup(v_config->toString(), 4096);
 }
 
 void x_tick(
@@ -47,8 +47,7 @@ void x_outputState(
 {
   sim::model::Wire * model = g_env.model<sim::model::Wire>(v_ref);
   if (model) {
-    model->dataBits(v_output->size());
-    v_output->fromBitVector(model->data());
+    model->dataTo(v_output);
   }
 }
 
@@ -59,10 +58,7 @@ void x_inputUpdate(
 {
   sim::model::Wire * model = g_env.model<sim::model::Wire>(v_ref);
   if (model) {
-    model->dataBits(v_input->size());
-    if (v_input->toBitVectorChanged(model->data())) {
-      model->changed();
-    }
+    model->dataFrom(v_input);
   }
 }
 
@@ -74,8 +70,7 @@ void x_pushUpdate(
 {
   sim::model::Event * model = g_env.model<sim::model::Event>(v_ref);
   if (model) {
-    model->ackBits(v_adata->size());
-    model->ack(v_ack.isSet(), v_adata->toUnit());
+    model->ackFrom(v_ack, v_adata);
   }
 }
 
@@ -87,9 +82,7 @@ void x_pushState(
 {
   sim::model::Event * model = g_env.model<sim::model::Event>(v_ref);
   if (model) {
-    model->stbBits(v_sdata->size());
-    v_strb->set(model->stbSet());
-    v_sdata->fromUnit(model->stbData());
+    model->stbTo(v_strb, v_sdata);
   }
 }
 
@@ -101,8 +94,7 @@ void x_pullUpdate(
 {
   sim::model::Event * model = g_env.model<sim::model::Event>(v_ref);
   if (model) {
-    model->stbBits(v_sdata->size());
-    model->stb(v_strb.isSet(), v_sdata->toUnit());
+    model->stbFrom(v_strb, v_sdata);
   }
 }
 
@@ -113,9 +105,7 @@ void x_pullState(
 {
   sim::model::Event * model = g_env.model<sim::model::Event>(v_ref);
   if (model) {
-    model->ackBits(v_adata->size());
-    v_ack->set(model->ackSet());
-    v_adata->fromUnit(model->ackData());
+    model->ackTo(v_ack, v_adata);
   }
 }
 
@@ -126,9 +116,7 @@ void x_sourceUpdate(
 {
   sim::model::Stream * model = g_env.model<sim::model::Stream>(v_ref);
   if (model) {
-    if (model->tHead() && v_tready.isSet()) {
-      model->tTake();
-    }
+    model->tNextFrom(v_tready);
   }
 }
 
@@ -142,22 +130,7 @@ void x_sourceState(
 {
   sim::model::Stream * model = g_env.model<sim::model::Stream>(v_ref);
   if (model) {
-    model->dataBits(v_tdata->size());
-    model->idBits(v_tid->size());
-    if (model->tHead()) {
-      const sim::model::StreamTBeat & beat = *model->tHead();
-      v_tdata->fromBitVector(beat.data);
-      v_tkeep->fromBitVectorValid(beat.data, 8);
-      v_tid->fromUnit(beat.id);
-      v_tlast->set(beat.last);
-      v_tvalid->set(true);
-    } else {
-      v_tdata->fill(sim::vhdl::Logic::VD);
-      v_tkeep->fill(sim::vhdl::Logic::VD);
-      v_tid->fill(sim::vhdl::Logic::VD);
-      v_tlast->set(sim::vhdl::Logic::VD);
-      v_tvalid->set(false);
-    }
+    model->tHeadTo(v_tdata, v_tkeep, v_tid, v_tlast, v_tvalid);
   }
 }
 
@@ -172,27 +145,17 @@ void x_sinkUpdate(
 {
   sim::model::Stream * model = g_env.model<sim::model::Stream>(v_ref);
   if (model) {
-    model->dataBits(v_tdata->size());
-    model->idBits(v_tid->size());
-    if (v_tvalid.isSet() && model->tFree()) {
-      sim::model::StreamTBeat beat (
-        v_tdata->size(),
-        (sim::Id)v_tid->toUnit(),
-        v_tlast.isSet());
-      v_tdata->toBitVector(beat.data);
-      v_tkeep->toBitVectorValid(beat.data, 8);
-      model->tPush(std::move(beat));
-    }
+    model->tPushFrom(v_tdata, v_tkeep, v_tid, v_tlast, v_tvalid);
   }
 }
 
 void x_sinkState(
   std::uint32_t           v_ref,
-  sim::vhdl::Logic      * v_ready)
+  sim::vhdl::Logic      * v_tready)
 {
   sim::model::Stream * model = g_env.model<sim::model::Stream>(v_ref);
   if (model) {
-    v_ready->set(model->tFree());
+    model->tFreeTo(v_tready);
   }
 }
 
@@ -213,29 +176,9 @@ void x_slaveWrUpdate(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->dataBits(v_wdata->size());
-    model->addrBits(v_awaddr->size());
-    model->idBits(v_awid->size());
-    if (model->awFree() && v_awvalid.isSet()) {
-      sim::model::MemoryABeat beat (
-        (sim::model::MemoryAddr)v_awaddr->toUnit(),
-        (sim::model::MemoryLen)v_awlen->toUnit(),
-        (sim::model::MemorySize)v_awsize->toUnit(),
-        (sim::model::MemoryBurst)v_awburst->toUnit(),
-        (sim::Id)v_awid->toUnit());
-      model->awPush(std::move(beat));
-    }
-    if (model->wFree() && v_wvalid.isSet()) {
-      sim::model::MemoryWBeat beat (
-        v_wdata->size(),
-        v_wlast.isSet());
-      v_wdata->toBitVector(beat.data);
-      v_wstrb->toBitVectorValid(beat.data, 8);
-      model->wPush(std::move(beat));
-    }
-    if (model->bHead() && v_bready.isSet()) {
-      model->bTake();
-    }
+    model->awPushFrom(v_awaddr, v_awlen, v_awsize, v_awburst, v_awid, v_awvalid);
+    model->wPushFrom(v_wdata, v_wstrb, v_wlast, v_wvalid);
+    model->bNextFrom(v_bready);
   }
 }
 
@@ -251,20 +194,8 @@ void x_slaveRdUpdate(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->addrBits(v_araddr->size());
-    model->idBits(v_arid->size());
-    if (model->arFree() && v_arvalid.isSet()) {
-      sim::model::MemoryABeat beat (
-        (sim::model::MemoryAddr)v_araddr->toUnit(),
-        (sim::model::MemoryLen)v_arlen->toUnit(),
-        (sim::model::MemorySize)v_arsize->toUnit(),
-        (sim::model::MemoryBurst)v_arburst->toUnit(),
-        (sim::Id)v_arid->toUnit());
-      model->arPush(std::move(beat));
-    }
-    if (model->rHead() && v_rready.isSet()) {
-      model->rTake();
-    }
+    model->arPushFrom(v_araddr, v_arlen, v_arsize, v_arburst, v_arid, v_arvalid);
+    model->rNextFrom(v_rready);
   }
 }
 
@@ -278,18 +209,9 @@ void x_slaveWrState(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    v_awready->set(model->awFree());
-    v_wready->set(model->wFree());
-    if (model->bHead()) {
-      const sim::model::MemoryBBeat & beat = *model->bHead();
-      v_bresp->fromUnit(beat.resp);
-      v_bid->fromUnit(beat.id);
-      v_bvalid->set(true);
-    } else {
-      v_bresp->fill(sim::vhdl::Logic::VD);
-      v_bid->fill(sim::vhdl::Logic::VD);
-      v_bvalid->set(false);
-    }
+    model->awFreeTo(v_awready);
+    model->wFreeTo(v_wready);
+    model->bHeadTo(v_bresp, v_bid, v_bvalid);
   }
 }
 
@@ -304,22 +226,8 @@ void x_slaveRdState(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->dataBits(v_rdata->size());
-    v_arready->set(model->arFree());
-    if (model->rHead()) {
-      const sim::model::MemoryRBeat & beat = *model->rHead();
-      v_rdata->fromBitVector(beat.data);
-      v_rresp->fromUnit(beat.resp);
-      v_rlast->set(beat.last);
-      v_rid->fromUnit(beat.id);
-      v_rvalid->set(true);
-    } else {
-      v_rdata->fill(sim::vhdl::Logic::VD);
-      v_rresp->fill(sim::vhdl::Logic::VD);
-      v_rlast->set(sim::vhdl::Logic::VD);
-      v_rid->fill(sim::vhdl::Logic::VD);
-      v_rvalid->set(false);
-    }
+    model->arFreeTo(v_arready);
+    model->rHeadTo(v_rdata,v_rresp, v_rlast, v_rid, v_rvalid);
   }
 }
 
@@ -334,18 +242,9 @@ void x_masterWrUpdate(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    if (model->awHead() && v_awready.isSet()) {
-      model->awTake();
-    }
-    if (model->wHead() && v_wready.isSet()) {
-      model->wTake();
-    }
-    if (model->bFree() && v_bvalid.isSet()) {
-      sim::model::MemoryBBeat beat(
-        (sim::Id)v_bid->toUnit(),
-        (sim::model::MemoryResp)v_bresp->toUnit());
-      model->bPush(std::move(beat));
-    }
+    model->awNextFrom(v_awready);
+    model->wNextFrom(v_wready);
+    model->bPushFrom(v_bresp, v_bid, v_bvalid);
   }
 }
 
@@ -360,19 +259,8 @@ void x_masterRdUpdate(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->dataBits(v_rdata->size());
-    if (model->arHead() && v_arready.isSet()) {
-      model->arTake();
-    }
-    if (model->rFree() && v_rvalid.isSet()) {
-      sim::model::MemoryRBeat beat (
-        v_rdata->size(),
-        (sim::Id)v_rid->toUnit(),
-        (sim::model::MemoryResp)v_rresp->toUnit(),
-        v_rlast.isSet());
-      v_rdata->toBitVector(beat.data);
-      model->rPush(std::move(beat));
-    }
+    model->arNextFrom(v_arready);
+    model->rPushFrom(v_rdata, v_rresp, v_rlast, v_rid, v_rvalid);
   }
 }
 
@@ -392,38 +280,9 @@ void x_masterWrState(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->dataBits(v_wdata->size());
-    model->addrBits(v_awaddr->size());
-    model->idBits(v_awid->size());
-    if (model->awHead()) {
-      const sim::model::MemoryABeat & beat = *model->awHead();
-      v_awaddr->fromUnit(beat.addr);
-      v_awlen->fromUnit(beat.info.len);
-      v_awsize->fromUnit(beat.info.size);
-      v_awburst->fromUnit(beat.info.burst);
-      v_awid->fromUnit(beat.id);
-      v_awvalid->set(true);
-    } else {
-      v_awaddr->fill(sim::vhdl::Logic::VD);
-      v_awlen->fill(sim::vhdl::Logic::VD);
-      v_awsize->fill(sim::vhdl::Logic::VD);
-      v_awburst->fill(sim::vhdl::Logic::VD);
-      v_awid->fill(sim::vhdl::Logic::VD);
-      v_awvalid->set(false);
-    }
-    if (model->wHead()) {
-      const sim::model::MemoryWBeat & beat = *model->wHead();
-      v_wdata->fromBitVector(beat.data);
-      v_wstrb->fromBitVectorValid(beat.data, 8);
-      v_wlast->set(beat.last);
-      v_wvalid->set(true);
-    } else {
-      v_wdata->fill(sim::vhdl::Logic::VD);
-      v_wstrb->fill(sim::vhdl::Logic::VD);
-      v_wlast->set(sim::vhdl::Logic::VD);
-      v_wvalid->set(false);
-    }
-    v_bready->set(model->bFree());
+    model->awHeadTo(v_awaddr, v_awlen, v_awsize, v_awburst, v_awid, v_awvalid);
+    model->wHeadTo(v_wdata, v_wstrb, v_wlast, v_wvalid);
+    model->bFreeTo(v_bready);
   }
 }
 
@@ -439,25 +298,8 @@ void x_masterRdState(
 {
   sim::model::Memory * model = g_env.model<sim::model::Memory>(v_ref);
   if (model) {
-    model->addrBits(v_araddr->size());
-    model->idBits(v_arid->size());
-    if (model->arHead()) {
-      const sim::model::MemoryABeat & beat = *model->arHead();
-      v_araddr->fromUnit(beat.addr);
-      v_arlen->fromUnit(beat.info.len);
-      v_arsize->fromUnit(beat.info.size);
-      v_arburst->fromUnit(beat.info.burst);
-      v_arid->fromUnit(beat.id);
-      v_arvalid->set(true);
-    } else {
-      v_araddr->fromUnit(sim::vhdl::Logic::VD);
-      v_arlen->fromUnit(sim::vhdl::Logic::VD);
-      v_arsize->fromUnit(sim::vhdl::Logic::VD);
-      v_arburst->fromUnit(sim::vhdl::Logic::VD);
-      v_arid->fromUnit(sim::vhdl::Logic::VD);
-      v_arvalid->set(false);
-    }
-    v_rready->set(model->rFree());
+    model->arHeadTo(v_araddr, v_arlen, v_arsize, v_arburst, v_arid, v_arvalid);
+    model->rFreeTo(v_rready);
   }
 }
 

@@ -68,6 +68,50 @@ void open(lua_State * L)
   luaL_newlib(L, f_bitv);
 }
 
+sim::BitVector * pushBitVector(lua_State * L, size_t bits, bool value, bool valid)
+{
+  sim::BitVector * bitv = (sim::BitVector *)lua_newuserdatauv(L, sizeof(sim::BitVector), 0);
+  new (bitv) sim::BitVector(bits, value, valid);
+  luaL_getmetatable(L, t_bitv);
+  lua_setmetatable(L, -2);
+  return bitv;
+}
+
+sim::BitVector * pushBitVector(lua_State * L, const sim::BitVector & other)
+{
+  sim::BitVector * bitv = (sim::BitVector *)lua_newuserdatauv(L, sizeof(sim::BitVector), 0);
+  new (bitv) sim::BitVector(other);
+  luaL_getmetatable(L, t_bitv);
+  lua_setmetatable(L, -2);
+  return bitv;
+}
+
+sim::BitVector * pushBitVector(lua_State * L, sim::BitVector && other)
+{
+  sim::BitVector * bitv = (sim::BitVector *)lua_newuserdatauv(L, sizeof(sim::BitVector), 0);
+  new (bitv) sim::BitVector(std::move(other));
+  luaL_getmetatable(L, t_bitv);
+  lua_setmetatable(L, -2);
+  return bitv;
+}
+
+sim::BitVector * getBitVector(lua_State * L, int pos, size_t defaultBits)
+{
+  if (lua_isnoneornil(L, pos)) {
+    sim::BitVector * bitv = pushBitVector(L);
+    lua_replace(L, pos);
+    return bitv;
+  } else if (lua_isinteger(L, pos)) {
+    lua_Integer value = lua_tointeger(L, pos);
+    sim::BitVector * bitv = pushBitVector(L, defaultBits);
+    bitv->unitSet(0, defaultBits, value, sim::UnitOnes);
+    lua_replace(L, pos);
+    return bitv;
+  } else {
+    return (sim::BitVector *)luaL_checkudata(L, pos, t_bitv);
+  }
+}
+
 // .new(bits : number, value : boolean := false, valid : boolean := false) : bitv
 int f_new(lua_State * L)
 {
@@ -110,7 +154,7 @@ int f_fromStr(lua_State * L)
   luaL_getmetatable(L, t_bitv);
   lua_setmetatable(L, -2);
 
-  bitv->fromString(str);
+  bitv->fromStr(str);
 
   return 1;
 }
@@ -271,7 +315,7 @@ int m_resize(lua_State * L)
 int m_toStr(lua_State * L)
 {
   sim::BitVector * bitv = (sim::BitVector *)luaL_checkudata(L, 1, t_bitv);
-  std::string str = bitv->toString();
+  std::string str = bitv->toStr();
   lua_pushlstring(L, str.c_str(), str.size());
   return 1;
 }

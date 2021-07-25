@@ -43,7 +43,7 @@ public:
   bool isValid() const;
   void set(Level v);
   void set(bool state);
-  void setX(bool state, bool valid);
+  void setV(bool state, bool valid, Level invvalue);
 };
 
 std::ostream & operator<<(std::ostream & os, const Logic & logic);

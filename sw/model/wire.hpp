@@ -8,6 +8,7 @@
 #include "../model.hpp"
 #include "../paramallocator.hpp"
 #include "../types.hpp"
+#include "../vhdl/logicarray.hpp"
 
 
 namespace sim::model {
@@ -23,17 +24,22 @@ public:
 
   virtual void tick() override;
 
-  inline sim::BitVector & data();
-  void changed();
+  void dataFrom(const sim::vhdl::LogicArray * data);
+  void dataTo(sim::vhdl::LogicArray * data);
+
+  inline void data(const sim::BitVector & data);
+  inline const sim::BitVector & data() const;
 
   inline sim::Signal sigChanged() const;
   sim::Signal sigMatch(const sim::BitVector & data);
 
   inline size_t dataBits();
-  void dataBits(size_t bits);
+
+protected:
+  void changed();
 
 private:
-  sim::BitVector m_data;
+  sim::BitVectorFlagged m_data;
 
   std::list<std::tuple<sim::BitVector, sim::SignalParam>> m_matchers;
   sim::ParamAllocator m_matcherIds;
@@ -44,7 +50,15 @@ private:
 
 namespace sim::model {
 
-inline sim::BitVector & Wire::data()
+inline void Wire::data(const sim::BitVector & data)
+{
+  m_data.set(0, m_data.bits(), data);
+  if (m_data.changed(false)) {
+    changed();
+  }
+}
+
+inline const sim::BitVector & Wire::data() const
 {
   return m_data;
 }

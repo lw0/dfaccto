@@ -1,0 +1,45 @@
+[*]
+[*] GTKWave Analyzer v3.3.108 (w)1999-2020 BSI
+[*] Thu Jul 22 10:37:59 2021
+[*]
+[dumpfile] "/home/lwenzel/repo/dfaccto/wave/Testbench_2021_07_21_211927.ghw"
+[dumpfile_mtime] "Wed Jul 21 19:19:32 2021"
+[dumpfile_size] 1501905
+[savefile] "/home/lwenzel/repo/dfaccto/teststream.gtkw"
+[timestart] 0
+[size] 1918 1174
+[pos] -1 -1
+*-27.000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[treeopen] top.testbench.
+[treeopen] top.testbench.s_stma_ms.
+[treeopen] top.testbench.s_stmb_ms.
+[sst_width] 318
+[signals_width] 140
+[sst_expanded] 1
+[sst_vpaned_height] 337
+@28
+top.testbench.s_sys.clk
+top.testbench.s_sys.rst_n
+@200
+-stmA
+@22
+#{top.testbench.s_stma_ms.tdata[63:0]} top.testbench.s_stma_ms.tdata[63] top.testbench.s_stma_ms.tdata[62] top.testbench.s_stma_ms.tdata[61] top.testbench.s_stma_ms.tdata[60] top.testbench.s_stma_ms.tdata[59] top.testbench.s_stma_ms.tdata[58] top.testbench.s_stma_ms.tdata[57] top.testbench.s_stma_ms.tdata[56] top.testbench.s_stma_ms.tdata[55] top.testbench.s_stma_ms.tdata[54] top.testbench.s_stma_ms.tdata[53] top.testbench.s_stma_ms.tdata[52] top.testbench.s_stma_ms.tdata[51] top.testbench.s_stma_ms.tdata[50] top.testbench.s_stma_ms.tdata[49] top.testbench.s_stma_ms.tdata[48] top.testbench.s_stma_ms.tdata[47] top.testbench.s_stma_ms.tdata[46] top.testbench.s_stma_ms.tdata[45] top.testbench.s_stma_ms.tdata[44] top.testbench.s_stma_ms.tdata[43] top.testbench.s_stma_ms.tdata[42] top.testbench.s_stma_ms.tdata[41] top.testbench.s_stma_ms.tdata[40] top.testbench.s_stma_ms.tdata[39] top.testbench.s_stma_ms.tdata[38] top.testbench.s_stma_ms.tdata[37] top.testbench.s_stma_ms.tdata[36] top.testbench.s_stma_ms.tdata[35] top.testbench.s_stma_ms.tdata[34] top.testbench.s_stma_ms.tdata[33] top.testbench.s_stma_ms.tdata[32] top.testbench.s_stma_ms.tdata[31] top.testbench.s_stma_ms.tdata[30] top.testbench.s_stma_ms.tdata[29] top.testbench.s_stma_ms.tdata[28] top.testbench.s_stma_ms.tdata[27] top.testbench.s_stma_ms.tdata[26] top.testbench.s_stma_ms.tdata[25] top.testbench.s_stma_ms.tdata[24] top.testbench.s_stma_ms.tdata[23] top.testbench.s_stma_ms.tdata[22] top.testbench.s_stma_ms.tdata[21] top.testbench.s_stma_ms.tdata[20] top.testbench.s_stma_ms.tdata[19] top.testbench.s_stma_ms.tdata[18] top.testbench.s_stma_ms.tdata[17] top.testbench.s_stma_ms.tdata[16] top.testbench.s_stma_ms.tdata[15] top.testbench.s_stma_ms.tdata[14] top.testbench.s_stma_ms.tdata[13] top.testbench.s_stma_ms.tdata[12] top.testbench.s_stma_ms.tdata[11] top.testbench.s_stma_ms.tdata[10] top.testbench.s_stma_ms.tdata[9] top.testbench.s_stma_ms.tdata[8] top.testbench.s_stma_ms.tdata[7] top.testbench.s_stma_ms.tdata[6] top.testbench.s_stma_ms.tdata[5] top.testbench.s_stma_ms.tdata[4] top.testbench.s_stma_ms.tdata[3] top.testbench.s_stma_ms.tdata[2] top.testbench.s_stma_ms.tdata[1] top.testbench.s_stma_ms.tdata[0]
+#{top.testbench.s_stma_ms.tkeep[7:0]} top.testbench.s_stma_ms.tkeep[7] top.testbench.s_stma_ms.tkeep[6] top.testbench.s_stma_ms.tkeep[5] top.testbench.s_stma_ms.tkeep[4] top.testbench.s_stma_ms.tkeep[3] top.testbench.s_stma_ms.tkeep[2] top.testbench.s_stma_ms.tkeep[1] top.testbench.s_stma_ms.tkeep[0]
+@28
+#{top.testbench.s_stma_ms.tid[1:0]} top.testbench.s_stma_ms.tid[1] top.testbench.s_stma_ms.tid[0]
+top.testbench.s_stma_ms.tlast
+top.testbench.s_stma_ms.tvalid
+top.testbench.s_stma_sm.tready
+@200
+-stmB
+@22
+#{top.testbench.s_stmb_ms.tdata[63:0]} top.testbench.s_stmb_ms.tdata[63] top.testbench.s_stmb_ms.tdata[62] top.testbench.s_stmb_ms.tdata[61] top.testbench.s_stmb_ms.tdata[60] top.testbench.s_stmb_ms.tdata[59] top.testbench.s_stmb_ms.tdata[58] top.testbench.s_stmb_ms.tdata[57] top.testbench.s_stmb_ms.tdata[56] top.testbench.s_stmb_ms.tdata[55] top.testbench.s_stmb_ms.tdata[54] top.testbench.s_stmb_ms.tdata[53] top.testbench.s_stmb_ms.tdata[52] top.testbench.s_stmb_ms.tdata[51] top.testbench.s_stmb_ms.tdata[50] top.testbench.s_stmb_ms.tdata[49] top.testbench.s_stmb_ms.tdata[48] top.testbench.s_stmb_ms.tdata[47] top.testbench.s_stmb_ms.tdata[46] top.testbench.s_stmb_ms.tdata[45] top.testbench.s_stmb_ms.tdata[44] top.testbench.s_stmb_ms.tdata[43] top.testbench.s_stmb_ms.tdata[42] top.testbench.s_stmb_ms.tdata[41] top.testbench.s_stmb_ms.tdata[40] top.testbench.s_stmb_ms.tdata[39] top.testbench.s_stmb_ms.tdata[38] top.testbench.s_stmb_ms.tdata[37] top.testbench.s_stmb_ms.tdata[36] top.testbench.s_stmb_ms.tdata[35] top.testbench.s_stmb_ms.tdata[34] top.testbench.s_stmb_ms.tdata[33] top.testbench.s_stmb_ms.tdata[32] top.testbench.s_stmb_ms.tdata[31] top.testbench.s_stmb_ms.tdata[30] top.testbench.s_stmb_ms.tdata[29] top.testbench.s_stmb_ms.tdata[28] top.testbench.s_stmb_ms.tdata[27] top.testbench.s_stmb_ms.tdata[26] top.testbench.s_stmb_ms.tdata[25] top.testbench.s_stmb_ms.tdata[24] top.testbench.s_stmb_ms.tdata[23] top.testbench.s_stmb_ms.tdata[22] top.testbench.s_stmb_ms.tdata[21] top.testbench.s_stmb_ms.tdata[20] top.testbench.s_stmb_ms.tdata[19] top.testbench.s_stmb_ms.tdata[18] top.testbench.s_stmb_ms.tdata[17] top.testbench.s_stmb_ms.tdata[16] top.testbench.s_stmb_ms.tdata[15] top.testbench.s_stmb_ms.tdata[14] top.testbench.s_stmb_ms.tdata[13] top.testbench.s_stmb_ms.tdata[12] top.testbench.s_stmb_ms.tdata[11] top.testbench.s_stmb_ms.tdata[10] top.testbench.s_stmb_ms.tdata[9] top.testbench.s_stmb_ms.tdata[8] top.testbench.s_stmb_ms.tdata[7] top.testbench.s_stmb_ms.tdata[6] top.testbench.s_stmb_ms.tdata[5] top.testbench.s_stmb_ms.tdata[4] top.testbench.s_stmb_ms.tdata[3] top.testbench.s_stmb_ms.tdata[2] top.testbench.s_stmb_ms.tdata[1] top.testbench.s_stmb_ms.tdata[0]
+#{top.testbench.s_stmb_ms.tkeep[7:0]} top.testbench.s_stmb_ms.tkeep[7] top.testbench.s_stmb_ms.tkeep[6] top.testbench.s_stmb_ms.tkeep[5] top.testbench.s_stmb_ms.tkeep[4] top.testbench.s_stmb_ms.tkeep[3] top.testbench.s_stmb_ms.tkeep[2] top.testbench.s_stmb_ms.tkeep[1] top.testbench.s_stmb_ms.tkeep[0]
+@28
+#{top.testbench.s_stmb_ms.tid[1:0]} top.testbench.s_stmb_ms.tid[1] top.testbench.s_stmb_ms.tid[0]
+top.testbench.s_stmb_ms.tlast
+top.testbench.s_stmb_ms.tvalid
+top.testbench.s_stmb_sm.tready
+[pattern_trace] 1
+[pattern_trace] 0

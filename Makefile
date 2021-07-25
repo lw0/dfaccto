@@ -4,12 +4,15 @@ INSTALL_DIR = $(shell realpath ./sub/dfaccto_tpl/)
 BUILD_DIR = $(shell realpath ./build)
 
 # Software testbench
+SW_SCRATCH_NAME = scratch.cpp
 SW_DIR = $(shell realpath ./sw)
 SW_BUILD_DIR = $(BUILD_DIR)/sw
 SW_LIB = $(SW_BUILD_DIR)/aux.a
-SW_SRCS = $(shell find $(SW_DIR) -name ".*" -prune -o -type f -name '*.cpp' -print)
+SW_SRCS = $(shell find $(SW_DIR) -name ".*" -prune -o -type f -name '*.cpp' ! -name $(SW_SCRATCH_NAME) -print)
 SW_OBJS = $(SW_SRCS:$(SW_DIR)/%.cpp=$(SW_BUILD_DIR)/%.o)
 SW_DEPS = $(SW_OBJS:.o=.d)
+SW_SCRATCH_SRC = $(SW_DIR)/$(SW_SCRATCH_NAME)
+SW_SCRATCH = $(SW_BUILD_DIR)/$(SW_SCRATCH_NAME:%.cpp=%)
 
 # Hardware sources
 HW_DIR = $(shell realpath ./hw)
@@ -22,7 +25,7 @@ HW_BUILD_DIR = $(BUILD_DIR)/hw
 HW_BUILD_SRCS_LIST = $(HW_BUILD_DIR)/sources.lst
 #------------------------------------------------------------------------------
 # Root config file for VHDL source generation (dfaccto_tpl)
-HW_CONFIG = $(HW_CONFIG_DIR)/testbench_event.py
+HW_CONFIG = $(HW_CONFIG_DIR)/testbench_stream.py
 #------------------------------------------------------------------------------
 # Toplevel VHDL Entity
 HW_TOP = Testbench
@@ -35,7 +38,7 @@ WAVE_FILE = $(HW_TOP)_$(shell date +%Y_%m_%d_%H%M%S).ghw
 WAVE_LINK = $(HW_TOP).ghw
 
 # Flags:
-CXXFLAGS += -std=c++17 -g
+CXXFLAGS += -std=c++17 -g -O0
 GHDLFLAGS += -g
 
 
@@ -130,6 +133,11 @@ $(SW_LIB): $(SW_OBJS)
 	$(AR) rcs $@ $^
 
 -include $(SW_DEPS)
+
+.PHONY: scratch
+scratch: $(SW_LIB)
+	$(CXX) $(CXXFLAGS) $(SW_SCRATCH_SRC) $(SW_LIB) -o $(SW_SCRATCH)
+	gdb $(SW_SCRATCH)
 
 
 #------------------------------------------------------------------------------

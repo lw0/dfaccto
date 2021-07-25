@@ -1,16 +1,152 @@
 #pragma once
 
 #include <functional>
-#include <list>
-#include <optional>
-#include <random>
-#include <set>
 #include <map>
+#include <random>
+#include <type_traits>
+#include <optional>
 
 #include "types.hpp"
 
 
 namespace sim {
+
+template <class T>
+struct MemberTest
+{
+  typedef char Yes[1];
+  typedef char No[2];
+
+  template <typename C, C> struct Check;
+
+  struct FakeBase {
+    bool last;
+    sim::Id id; };
+
+  struct TestSubject : public FakeBase, public T {};
+
+  template <typename C> static No & TestLast(Check<bool FakeBase::*, &C::last> *);
+  template <typename> static Yes & TestLast(...);
+
+  template <typename C> static No & TestId(Check<sim::Id FakeBase::*, &C::id> *);
+  template <typename> static Yes & TestId(...);
+
+  const static bool haslast = sizeof(TestLast<TestSubject>(0)) == sizeof(Yes);
+  const static bool hasid = sizeof(TestId<TestSubject>(0)) == sizeof(Yes);
+};
+
+template <typename T, typename std::enable_if<MemberTest<T>::haslast, bool>::type = true>
+inline bool _get_last(const T & item) { return item.last; }
+
+template <typename T, typename std::enable_if<!MemberTest<T>::haslast, bool>::type = true>
+inline bool _get_last(const T & item) { return true; }
+
+template <typename T, typename std::enable_if<MemberTest<T>::hasid, bool>::type = true>
+inline sim::Id _get_id(const T & item) { return item.id; }
+
+template <typename T, typename std::enable_if<!MemberTest<T>::hasid, bool>::type = true>
+inline sim::Id _get_id(const T & item) { return 0; }
+
+
+template<typename T> struct ChannelItem;
+
+template<typename T>
+struct ChannelList
+{
+  ChannelItem<T> * front;
+  ChannelItem<T> * back;
+
+  ChannelList()
+  : front {nullptr}
+  , back {nullptr}
+  { }
+};
+
+template<typename T>
+inline void _unlink(ChannelList<T> & list, ChannelItem<T> * & next, ChannelItem<T> * & prev)
+{
+  if (!next) {
+    list.back = prev;
+  } else {
+    next->prev = prev;
+  }
+  if (!prev) {
+    list.front = next;
+  } else {
+    prev->next = next;
+  }
+  next = nullptr;
+  prev = nullptr;
+}
+
+template<typename T>
+inline void _linkFront(ChannelList<T> & list, ChannelItem<T> * & next, ChannelItem<T> * & prev, ChannelItem<T> * me)
+{
+  next = list.front;
+  prev = nullptr;
+  list.front = me;
+  if (!next) {
+    list.back = me;
+  } else {
+    next->prev = me;
+  }
+}
+
+template<typename T>
+inline void _linkBack(ChannelList<T> & list, ChannelItem<T> * & next, ChannelItem<T> * & prev, ChannelItem<T> * me)
+{
+  next = nullptr;
+  prev = list.back;
+  list.back = me;
+  if (!prev) {
+    list.front = me;
+  } else {
+    prev->next = me;
+  }
+}
+
+
+template<typename T>
+struct ChannelItem
+{
+  T data;
+  sim::Delay blockUntil;
+  ChannelItem<T> * next;
+  ChannelItem<T> * prev;
+
+  inline bool last() const { return _get_last(data); }
+  inline sim::Id id() const { return _get_id(data); }
+  inline bool blocked(sim::Delay now) { return !DelayAtOrAfter(now, blockUntil); }
+
+  ChannelItem()
+  : data {}
+  , blockUntil {0}
+  , next {nullptr}
+  , prev {nullptr}
+  { }
+
+  void unlink(ChannelList<T> & list) { _unlink(list, next, prev); }
+  void linkFront(ChannelList<T> & list) { _linkFront(list, next, prev, this); }
+  void linkBack(ChannelList<T> & list) { _linkBack(list, next, prev, this); }
+};
+
+
+template<typename T>
+struct ChannelContext
+{
+  ChannelList<T> items;
+  ChannelItem<T> * head;
+  size_t itemCount;
+  size_t packetCount;
+
+  ChannelContext()
+  : items {}
+  , head {nullptr}
+  , itemCount {0}
+  , packetCount {0}
+  { }
+};
+
 
 using ChannelFlags = uint8_t;
 constexpr ChannelFlags ChannelPushNoblock = 0x01;
@@ -19,132 +155,194 @@ constexpr ChannelFlags ChannelUnordered = 0x10;
 constexpr ChannelFlags ChannelFairArbit = 0x20;
 constexpr ChannelFlags ChannelPackArbit = 0x40;
 
-template <typename T>
-class Channel
+
+template<typename T>
+class ChannelBase
 {
-  struct ChannelItem
-  {
-    T item;
-    sim::Delay timeout;
-    sim::Id id;
-    bool last;
-
-    inline ChannelItem(T && item, sim::Id id, bool last, sim::Delay timeout)
-    : item {std::move(item)}
-    , timeout {timeout}
-    , id {id}
-    , last {last}
-    { }
-
-    inline ChannelItem(const T & item, sim::Id id, bool last, sim::Delay timeout)
-    : item {item}
-    , timeout {timeout}
-    , id {id}
-    , last {last}
-    { }
-  };
-
-  using TQueue = std::list<ChannelItem>;
-  using TQueueIter = typename TQueue::iterator;
-  using THeadMap = std::map<sim::Id, std::optional<TQueueIter>>;
-
   using TRndEngine = std::default_random_engine;
   using TRndDist = std::poisson_distribution<sim::Delay>;
 
 public:
-  // TODO-lw reorganize names and concepts!
-  Channel(size_t depth = 0,
+  ChannelBase(size_t depth = 0,
           float pushBandwidth = 1.f,
           float takeBandwidth = 1.f,
           float itemLatency = 0.f,
           ChannelFlags flags = 0,
-          sim::RndSeed seed = 0,
-          bool enablePush = true,
-          bool enableTake = true);
+          sim::RndSeed seed = 0);
+  ~ChannelBase();
 
   void reset(sim::RndSeed seed = 0);
   void tick();
 
-  inline void enablePush(bool enabled);
-  inline void enableTake(bool enabled);
+  inline size_t itemCount() const;
+  inline size_t packetCount() const;
 
-  inline bool free() const;
-  bool push(T && item, sim::Id id, bool last);
-  bool push(const T & item, sim::Id id, bool last);
+  inline void pushEnable(bool enabled);
+  inline bool pushEnable() const;
+  inline void takeEnable(bool enabled);
+  inline bool takeEnable() const;
 
-  inline const T * head(sim::Id id = 0) const;
-  std::optional<T> take(sim::Id id = 0, bool mayArbit = false);
-
-  inline const T * headArbit() const;
-  std::optional<T> takeArbit();
-  inline sim::Id curId() const;
+  inline void setFreeCallback(std::function<void(void)> callback);
+  inline void setPushCallback(std::function<void(sim::Id, bool)> callback);
+  inline void setHeadCallback(std::function<void(sim::Id, bool)> callback);
+  inline void setTakeCallback(std::function<void(sim::Id, bool)> callback);
 
 protected:
-  // void update();
-  // void updateFor(sim::Id target);
-  bool arbit() const;
+  inline bool mayPush() const;
+  inline bool mayTake(ChannelContext<T> & context) const;
+
+  bool selectItem(ChannelContext<T> & context);
+
+  void pushItem(ChannelContext<T> & context, ChannelItem<T> * item);
+
+  ChannelItem<T> * takeItem(ChannelContext<T> & context);
+
+  void clearItems(ChannelContext<T> & context);
+
+  template <typename... Args>
+  ChannelItem<T> * allocItem(sim::Delay delay, Args&&... args);
+  T freeItem(ChannelItem<T> * item);
 
   void rndSeed(sim::RndSeed seed);
   inline sim::Delay rndPushDelay();
   inline sim::Delay rndTakeDelay();
   inline sim::Delay rndItemDelay();
 
-  inline bool isPushNoblock() const;
-  inline bool isTakeNoblock() const;
-  inline bool isUnordered() const;
-  inline bool isFairArbit() const;
-  inline bool isPackArbit() const;
+  inline bool is(ChannelFlags flag) const;
+
+  inline void doFreeCallback();
+  inline void doPushCallback(sim::Id id, bool last);
+  inline void doHeadCallback(sim::Id id, bool last);
+  inline void doTakeCallback(sim::Id id, bool last);
 
 private:
   ChannelFlags m_flags;
   size_t m_depth;
 
-  bool m_enablePush;
-  sim::Delay m_pushTimeout;
-  bool m_enableTake;
-  sim::Delay m_takeTimeout;
+  bool m_lastFree;
+  size_t m_itemCount;
+  size_t m_packetCount;
 
-  TQueue m_queue;
-  mutable THeadMap m_heads;
-  mutable sim::Id m_curId;
-  mutable bool m_latchId;
+  sim::Delay m_timestamp;
+  bool m_pushEnable;
+  sim::Delay m_pushTimeout;
+  bool m_takeEnable;
+  sim::Delay m_takeTimeout;
 
   sim::RndSeed m_lastSeed;
   TRndEngine m_rndGen;
   TRndDist m_rndDistPushDelay;
   TRndDist m_rndDistTakeDelay;
   TRndDist m_rndDistItemDelay;
+
+  ChannelList<T> m_freelist;
+
+  std::function<void(void)> m_freeCallback;
+  std::function<void(sim::Id, bool)> m_pushCallback;
+  std::function<void(sim::Id, bool)> m_headCallback;
+  std::function<void(sim::Id, bool)> m_takeCallback;
 };
 
-} // namespace sim
 
+template <typename T>
+class SingleChannel : public ChannelBase<T>
+{
+public:
+  SingleChannel(size_t depth = 0,
+          float pushBandwidth = 1.f,
+          float takeBandwidth = 1.f,
+          float itemLatency = 0.f,
+          ChannelFlags flags = 0,
+          sim::RndSeed seed = 0);
+  ~SingleChannel();
+
+  void reset(sim::RndSeed seed = 0);
+  void tick();
+
+  inline bool free() const;
+  template <typename... Args>
+  bool push(sim::Delay delay, Args... args);
+
+  const T * head();
+  std::optional<T> take();
+
+private:
+  ChannelContext<T> m_global;
+};
+
+template <typename T>
+class MultiChannel : public ChannelBase<T>
+{
+public:
+  MultiChannel(size_t depth = 0,
+          float pushBandwidth = 1.f,
+          float takeBandwidth = 1.f,
+          float itemLatency = 0.f,
+          ChannelFlags flags = 0,
+          sim::RndSeed seed = 0);
+  ~MultiChannel();
+
+  void reset(sim::RndSeed seed = 0);
+  void tick();
+
+  inline size_t itemCount(sim::Id id) const;
+  inline size_t packetCount(sim::Id id) const;
+
+  inline bool free() const;
+  template <typename... Args>
+  bool push(sim::Delay delay, Args... args);
+
+  const T * head(sim::Id id);
+  std::optional<T> take(sim::Id id);
+
+  const T * head();
+  std::optional<T> take();
+
+protected:
+  bool arbit() const;
+
+private:
+  mutable std::map<sim::Id, ChannelContext<T>> m_perId;
+
+  mutable sim::Id m_curId;
+  mutable bool m_latchId;
+};
+
+}
 
 namespace sim {
 
+//-----------------------------------------------------------------------------
+// ChannelBase
+//-----------------------------------------------------------------------------
+
 template <typename T>
-Channel<T>::Channel(size_t depth,
+ChannelBase<T>::ChannelBase(size_t depth,
                     float pushBandwidth,
                     float takeBandwidth,
                     float itemLatency,
-                    std::uint8_t flags,
-                    sim::RndSeed seed,
-                    bool enablePush,
-                    bool enableTake)
+                    ChannelFlags flags,
+                    sim::RndSeed seed)
 : m_flags {flags}
 , m_depth {depth}
-, m_enablePush {enablePush}
-, m_pushTimeout {}
-, m_enableTake {enableTake}
-, m_takeTimeout {}
-, m_queue {}
-, m_heads {}
-, m_curId {0}
-, m_latchId {false}
+, m_lastFree {false}
+, m_itemCount {0}
+, m_packetCount {0}
+, m_timestamp {0}
+, m_pushEnable {true}
+, m_pushTimeout {0}
+, m_takeEnable {true}
+, m_takeTimeout {0}
 , m_lastSeed {0}
 , m_rndGen {}
-, m_rndDistPushDelay {(pushBandwidth <= 0 || pushBandwidth > 1)? 0 : (1 - pushBandwidth) / pushBandwidth}
-, m_rndDistTakeDelay {(takeBandwidth <= 0 || takeBandwidth > 1)? 0 : (1 - takeBandwidth) / takeBandwidth}
-, m_rndDistItemDelay {(itemLatency < 0)? 0 : itemLatency}
+, m_rndDistPushDelay {(pushBandwidth <= 0.f || pushBandwidth > 1.f)? 0.f : (1.f - pushBandwidth) / pushBandwidth}
+, m_rndDistTakeDelay {(takeBandwidth <= 0.f || takeBandwidth > 1.f)? 0.f : (1.f - takeBandwidth) / takeBandwidth}
+, m_rndDistItemDelay {(itemLatency < 0.f)? 0.f : itemLatency}
+, m_freelist {}
+, m_freeCallback {nullptr}
+, m_pushCallback {nullptr}
+, m_headCallback {nullptr}
+, m_takeCallback {nullptr}
 {
   rndSeed(seed);
   m_pushTimeout = rndPushDelay();
@@ -152,198 +350,205 @@ Channel<T>::Channel(size_t depth,
 }
 
 template <typename T>
-void Channel<T>::reset(sim::RndSeed seed)
+ChannelBase<T>::~ChannelBase()
+{
+  for (ChannelItem<T> * cur = m_freelist.front, * next; cur; cur = next) {
+    next = cur->next;
+    delete cur;
+  }
+}
+
+template <typename T>
+void ChannelBase<T>::reset(sim::RndSeed seed)
 {
   rndSeed(seed);
-  m_queue.clear();
-  m_heads.clear();
-  m_curId = 0;
-  m_latchId = false;
+  m_itemCount = 0;
+  m_packetCount = 0;
+  m_timestamp = 0;
   m_pushTimeout = rndPushDelay();
   m_takeTimeout = rndTakeDelay();
 }
 
 template <typename T>
-void Channel<T>::tick()
+void ChannelBase<T>::tick()
 {
-  if (m_enablePush && m_pushTimeout > 0) --m_pushTimeout;
-  if (m_enableTake && m_takeTimeout > 0) --m_takeTimeout;
+  ++m_timestamp;
+  if (m_pushEnable && m_pushTimeout > 0) --m_pushTimeout;
+  if (m_takeEnable && m_takeTimeout > 0) --m_takeTimeout;
 
-  std::set<sim::Id> blocked;
-  for (auto it = m_queue.begin(); it != m_queue.end(); ++it) {
-    if (it->timeout > 0) --(it->timeout);
-    bool valid = it->timeout == 0;
+  bool nowFree = mayPush();
+  if (!m_lastFree && nowFree) {
+    doFreeCallback();
+  }
+  m_lastFree = nowFree;
+}
 
-    if (!blocked.count(it->id)) {
-      if (valid || !isUnordered()) {
-        blocked.insert(it->id); // if ordered, all items after invalid item are blocked
-      }
 
-      if (valid && !m_heads[it->id]) {
-        m_heads[it->id] = it; // assign new head if required and valid
-      }
+template <typename T>
+inline size_t ChannelBase<T>::itemCount() const
+{
+  return m_itemCount;
+}
+
+template <typename T>
+inline size_t ChannelBase<T>::packetCount() const
+{
+  return m_packetCount;
+}
+
+template <typename T>
+inline void ChannelBase<T>::pushEnable(bool enabled)
+{
+  m_pushEnable = enabled;
+}
+
+template <typename T>
+inline bool ChannelBase<T>::pushEnable() const
+{
+  return m_pushEnable;
+}
+
+template <typename T>
+inline void ChannelBase<T>::takeEnable(bool enabled)
+{
+  m_takeEnable = enabled;
+}
+
+template <typename T>
+inline bool ChannelBase<T>::takeEnable() const
+{
+  return m_takeEnable;
+}
+
+template <typename T>
+inline void ChannelBase<T>::setFreeCallback(std::function<void(void)> callback)
+{
+  m_freeCallback = callback;
+}
+
+template <typename T>
+inline void ChannelBase<T>::setPushCallback(std::function<void(sim::Id, bool)> callback)
+{
+  m_pushCallback = callback;
+}
+
+template <typename T>
+inline void ChannelBase<T>::setHeadCallback(std::function<void(sim::Id, bool)> callback)
+{
+  m_headCallback = callback;
+}
+
+template <typename T>
+inline void ChannelBase<T>::setTakeCallback(std::function<void(sim::Id, bool)> callback)
+{
+  m_takeCallback = callback;
+}
+
+template <typename T>
+inline bool ChannelBase<T>::mayPush() const
+{
+  return m_pushTimeout == 0 && (m_depth == 0 || m_itemCount < m_depth);
+}
+
+template <typename T>
+inline bool ChannelBase<T>::mayTake(ChannelContext<T> & context) const
+{
+  return m_takeTimeout == 0 && context.head;
+}
+
+template <typename T>
+bool ChannelBase<T>::selectItem(ChannelContext<T> & context)
+{
+  for (ChannelItem<T> * it = context.items.front; it; it = it->next) {
+    if (!it->blocked(m_timestamp)) {
+      context.head = it;
+      doHeadCallback(it->id(), it->last());
+      return true;
+    } else if (!is(ChannelUnordered)) {
+      break;
     }
   }
+  context.head = nullptr;
+  return false;
 }
 
 template <typename T>
-inline void Channel<T>::enablePush(bool enabled)
+void ChannelBase<T>::pushItem(ChannelContext<T> & context, ChannelItem<T> * item)
 {
-  m_enablePush = enabled;
-}
-
-template <typename T>
-inline void Channel<T>::enableTake(bool enabled)
-{
-  m_enableTake = enabled;
-}
-
-template <typename T>
-inline bool Channel<T>::free() const
-{
-  return m_pushTimeout == 0 && (m_depth == 0 || m_queue.size() < m_depth);
-}
-
-template <typename T>
-bool Channel<T>::push(T && item, sim::Id id, bool last)
-{
-  if (!free()) {
-    return false;
-  }
-  m_queue.emplace_back(std::move(item), id, last, rndItemDelay());
   m_pushTimeout = rndPushDelay();
-  return true;
-}
 
-template <typename T>
-bool Channel<T>::push(const T & item, sim::Id id, bool last)
-{
-  if (!free()) {
-    return false;
+  item->linkBack(context.items);
+
+  ++m_itemCount;
+  ++context.itemCount;
+  if (item->last()) {
+    ++m_packetCount;
+    ++context.packetCount;
   }
-  m_queue.emplace_back(item, id, last, rndItemDelay());
-  m_pushTimeout = rndPushDelay();
-  return true;
+
+  doPushCallback(item->id(), item->last());
 }
 
 template <typename T>
-inline const T * Channel<T>::head(sim::Id id) const
+ChannelItem<T> * ChannelBase<T>::takeItem(ChannelContext<T> & context)
 {
-  if (m_takeTimeout > 0 || !m_heads[id])
-    return nullptr;
-
-  return &((*m_heads[id])->item);
-}
-
-template <typename T>
-std::optional<T> Channel<T>::take(sim::Id id, bool mayArbit)
-{
-  if (m_takeTimeout > 0 || !m_heads[id])
-    return std::nullopt;
-
-  TQueueIter it = *m_heads[id];
-  T tmp = std::move(it->item);
-  if (mayArbit && id == m_curId && (it->last || !isPackArbit())) {
-    m_latchId = false; // mark for rearbitration
-  }
-  m_queue.erase(it);
-  m_heads[id] = std::nullopt;
   m_takeTimeout = rndTakeDelay();
-  if (m_takeTimeout == 0) {
-    // try to find the next head immediately
-    for (it = m_queue.begin(); it != m_queue.end(); ++it) {
-      if (it->id != id) {
-        continue;
-      }
-      bool valid = it->timeout == 0;
-      if (valid) {
-        m_heads[id] = it;
-      }
-      if (!isUnordered() || valid) {
-        break;
-      }
-    }
+
+  ChannelItem<T> * item = context.head;
+  item->unlink(context.items);
+
+  selectItem(context);
+
+  --m_itemCount;
+  --context.itemCount;
+  if (item->last()) {
+    --m_packetCount;
+    --context.packetCount;
   }
-  return tmp;
+
+  doTakeCallback(item->id(), item->last());
+
+  return item;
 }
 
 template <typename T>
-inline const T * Channel<T>::headArbit() const
+void ChannelBase<T>::clearItems(ChannelContext<T> & context)
 {
-  if (!m_latchId) {
-    // latch (new) m_curId if arbit() succeeds
-    m_latchId = arbit();
+  for (ChannelItem<T> * cur = context.items.front, * next; cur; cur = next) {
+    next = cur->next;
+    cur->unlink(context.items);
+    freeItem(cur);
   }
-  return head(m_curId);
+  context.head = nullptr;
+  context.itemCount = 0;
+  context.packetCount = 0;
 }
 
 template <typename T>
-std::optional<T> Channel<T>::takeArbit()
+template <typename... Args>
+ChannelItem<T> * ChannelBase<T>::allocItem(sim::Delay delay, Args&&... args)
 {
-  if (!m_latchId) {
-    // latch (new) m_curId if arbit() succeeds
-    m_latchId = arbit();
+  ChannelItem<T> * item;
+  if (m_freelist.front) {
+    item = m_freelist.front;
+    item->unlink(m_freelist);
+  } else {
+    item = new ChannelItem<T>;
   }
-  return take(m_curId, true);
+  item->data = {std::forward<Args>(args)...};
+  item->blockUntil = m_timestamp + delay + rndItemDelay();
+  return item;
 }
 
 template <typename T>
-inline sim::Id Channel<T>::curId() const
+T ChannelBase<T>::freeItem(ChannelItem<T> * item)
 {
-  return m_curId;
-}
-
-// template <typename T>
-// void Channel<T>::update()
-// {
-//   std::set<sim::Id> blocked;
-//   for (auto it = m_queue.begin(); it != m_queue.end(); ++it) {
-//     if (it->timeout > 0) --(it->timeout);
-//     bool valid = it->timeout == 0;
-
-//     if (!blocked.count(it->id)) {
-//       if (valid || !isUnordered()) {
-//         blocked.insert(it->id); // if ordered, all items after invalid item are blocked
-//       }
-
-//       if (valid && !m_heads[it->id]) {
-//         m_heads[it->id] = it; // assign new head if required and valid
-//       }
-//     }
-//   }
-// }
-
-// template <typename T>
-// void Channel<T>::updateFor(sim::Id target)
-// {
-//   if (m_heads[target].head)
-//     return;
-
-//   for (auto it = m_queue.begin(); it != m_queue.end(); ++it) {
-//     if (it->id != target) {
-//       continue;
-//     }
-//     bool valid = it->timeout == 0;
-//     if (valid) {
-//       m_heads[target].head = it;
-//     }
-//     if (!isUnordered() || valid) {
-//       return;
-//     }
-//   }
-// }
-
-template <typename T>
-bool Channel<T>::arbit() const
-{
-  return sim::arbit<std::optional<TQueueIter>>(m_curId, m_heads, isFairArbit(),
-    [](const std::optional<TQueueIter> & opt){
-      return (bool)opt;
-    });
+  item->linkFront(m_freelist);
+  return std::move(item->data);
 }
 
 template <typename T>
-void Channel<T>::rndSeed(sim::RndSeed seed)
+void ChannelBase<T>::rndSeed(sim::RndSeed seed)
 {
   if (seed != 0) {
     m_lastSeed = seed ^ (sim::RndSeed)this;
@@ -354,51 +559,520 @@ void Channel<T>::rndSeed(sim::RndSeed seed)
 }
 
 template <typename T>
-inline uint32_t Channel<T>::rndPushDelay()
+inline uint32_t ChannelBase<T>::rndPushDelay()
 {
-  return isPushNoblock()? 0 : m_rndDistPushDelay(m_rndGen) + 1;
+  return is(ChannelPushNoblock)? 0 : m_rndDistPushDelay(m_rndGen) + 1;
 }
 
 template <typename T>
-inline uint32_t Channel<T>::rndTakeDelay()
+inline uint32_t ChannelBase<T>::rndTakeDelay()
 {
-  return isTakeNoblock()? 0 : m_rndDistTakeDelay(m_rndGen) + 1;
+  return is(ChannelTakeNoblock)? 0 : m_rndDistTakeDelay(m_rndGen) + 1;
 }
 
 template <typename T>
-inline uint32_t Channel<T>::rndItemDelay()
+inline uint32_t ChannelBase<T>::rndItemDelay()
 {
   return m_rndDistItemDelay(m_rndGen) + 1;
 }
 
 template <typename T>
-inline bool Channel<T>::isPushNoblock() const
+inline bool ChannelBase<T>::is(ChannelFlags flag) const
 {
-  return m_flags & ChannelPushNoblock;
+  return m_flags & flag;
 }
 
 template <typename T>
-inline bool Channel<T>::isTakeNoblock() const
+inline void ChannelBase<T>::doFreeCallback()
 {
-  return m_flags & ChannelTakeNoblock;
+  if (m_freeCallback) {
+    m_freeCallback();
+  }
 }
 
 template <typename T>
-inline bool Channel<T>::isUnordered() const
+inline void ChannelBase<T>::doPushCallback(sim::Id id, bool last)
 {
-  return m_flags & ChannelUnordered;
+  if (m_pushCallback) {
+    m_pushCallback(id, last);
+  }
 }
 
 template <typename T>
-inline bool Channel<T>::isFairArbit() const
+inline void ChannelBase<T>::doHeadCallback(sim::Id id, bool last)
 {
-  return m_flags & ChannelFairArbit;
+  if (m_headCallback) {
+    m_headCallback(id, last);
+  }
 }
 
 template <typename T>
-inline bool Channel<T>::isPackArbit() const
+inline void ChannelBase<T>::doTakeCallback(sim::Id id, bool last)
 {
-  return m_flags & ChannelPackArbit;
+  if (m_takeCallback) {
+    m_takeCallback(id, last);
+  }
 }
 
-} // namespace sim
+
+//-----------------------------------------------------------------------------
+// SingleChannel
+//-----------------------------------------------------------------------------
+
+template <typename T>
+SingleChannel<T>::SingleChannel(size_t depth,
+                                float pushBandwidth,
+                                float takeBandwidth,
+                                float itemLatency,
+                                ChannelFlags flags,
+                                sim::RndSeed seed)
+: ChannelBase<T> (depth, pushBandwidth, takeBandwidth, itemLatency, flags, seed)
+, m_global { }
+{ }
+
+template <typename T>
+SingleChannel<T>::~SingleChannel()
+{
+  ChannelBase<T>::clearItems(m_global);
+}
+
+template <typename T>
+void SingleChannel<T>::reset(sim::RndSeed seed)
+{
+  ChannelBase<T>::reset(seed);
+  ChannelBase<T>::clearItems(m_global);
+}
+
+template <typename T>
+void SingleChannel<T>::tick()
+{
+  ChannelBase<T>::tick();
+
+  if (!m_global.head) {
+    ChannelBase<T>::selectItem(m_global);
+  }
+}
+
+template <typename T>
+inline bool SingleChannel<T>::free() const
+{
+  return ChannelBase<T>::mayPush();
+}
+
+template <typename T>
+template <typename... Args>
+bool SingleChannel<T>::push(sim::Delay delay, Args... args)
+{
+  if (!ChannelBase<T>::mayPush()) {
+    return false;
+  }
+
+  ChannelItem<T> * item = ChannelBase<T>::allocItem(delay, std::forward<Args>(args)...);
+  ChannelBase<T>::pushItem(m_global, item);
+  return true;
+}
+
+template <typename T>
+const T * SingleChannel<T>::head()
+{
+  if (!ChannelBase<T>::mayTake(m_global)) {
+    return nullptr;
+  }
+
+  return &(m_global.head->data);
+}
+
+template <typename T>
+std::optional<T> SingleChannel<T>::take()
+{
+  if (!ChannelBase<T>::mayTake(m_global)) {
+    return std::nullopt;
+  }
+
+  ChannelItem<T> * item = ChannelBase<T>::takeItem(m_global);
+  return ChannelBase<T>::freeItem(item);
+}
+
+//-----------------------------------------------------------------------------
+// MultiChannel
+//-----------------------------------------------------------------------------
+
+template <typename T>
+  MultiChannel<T>::MultiChannel(size_t depth,
+                              float pushBandwidth,
+                              float takeBandwidth,
+                              float itemLatency,
+                              ChannelFlags flags,
+                              sim::RndSeed seed)
+: ChannelBase<T> (depth, pushBandwidth, takeBandwidth, itemLatency, flags, seed)
+, m_perId {}
+, m_curId {0}
+, m_latchId {false}
+{ }
+
+template <typename T>
+MultiChannel<T>::~MultiChannel()
+{
+  for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+    ChannelContext<T> & perId = it->second;
+    ChannelBase<T>::clearItems(perId);
+  }
+}
+
+template <typename T>
+void MultiChannel<T>::reset(sim::RndSeed seed)
+{
+  ChannelBase<T>::reset(seed);
+
+  m_curId = 0;
+  m_latchId = false;
+  for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+    ChannelContext<T> & perId = it->second;
+    ChannelBase<T>::clearItems(perId);
+  }
+}
+
+template <typename T>
+void MultiChannel<T>::tick()
+{
+  ChannelBase<T>::tick();
+
+  for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+    ChannelContext<T> & perId = it->second;
+    if (!perId.head) {
+      ChannelBase<T>::selectItem(perId);
+    }
+  }
+}
+
+template <typename T>
+inline size_t MultiChannel<T>::itemCount(sim::Id id) const
+{
+  return m_perId[id].itemCount;
+}
+
+template <typename T>
+inline size_t MultiChannel<T>::packetCount(sim::Id id) const
+{
+  return m_perId[id].packetCount;
+}
+
+
+template <typename T>
+inline bool MultiChannel<T>::free() const
+{
+  return ChannelBase<T>::mayPush();
+}
+
+template <typename T>
+template <typename... Args>
+bool MultiChannel<T>::push(sim::Delay delay, Args... args)
+{
+  if (!ChannelBase<T>::mayPush()) {
+    return false;
+  }
+
+  ChannelItem<T> * item = ChannelBase<T>::allocItem(delay, std::forward<Args>(args)...);
+  ChannelContext<T> & perId = m_perId[item->id()];
+  ChannelBase<T>::pushItem(perId, item);
+  return true;
+}
+
+template <typename T>
+const T * MultiChannel<T>::head(sim::Id id)
+{
+  ChannelContext<T> & perId = m_perId[id];
+  if (!ChannelBase<T>::mayTake(perId)) {
+    return nullptr;
+  }
+
+  return &(perId.head->data);
+}
+
+template <typename T>
+std::optional<T> MultiChannel<T>::take(sim::Id id)
+{
+  ChannelContext<T> & perId = m_perId[id];
+  if (!ChannelBase<T>::mayTake(perId)) {
+    return std::nullopt;
+  }
+
+  ChannelItem<T> * item = ChannelBase<T>::takeItem(perId);
+  return ChannelBase<T>::freeItem(item);
+}
+
+template <typename T>
+const T * MultiChannel<T>::head()
+{
+  if (!m_latchId) {
+    m_latchId = arbit();
+  }
+
+  ChannelContext<T> & perId = m_perId[m_curId];
+  if (!ChannelBase<T>::mayTake(perId)) {
+    return nullptr;
+  }
+
+  return &(perId.head->data);
+}
+
+/* Using take() and take(id) together on the same MultiChannel
+ * may cause undesired blocking:
+   * m_latchId is only set when arbit detects a valid head once
+   * if afterwards the head is taken via take(id),
+   * m_latchId will not be cleared so the MultiChannel may block
+   * until either another beat or the entire packet on the
+   * latched ID become available, even if there are valid heads
+   * available on other IDs!
+ */
+
+template <typename T>
+std::optional<T> MultiChannel<T>::take()
+{
+  if (!m_latchId) {
+    m_latchId = arbit();
+  }
+
+  ChannelContext<T> & perId = m_perId[m_curId];
+  if (!ChannelBase<T>::mayTake(perId)) {
+    return std::nullopt;
+  }
+
+  ChannelItem<T> * item = ChannelBase<T>::takeItem(perId);
+  if (!ChannelBase<T>::is(ChannelPackArbit) || item->last()) {
+    m_latchId = false;
+  }
+
+  return ChannelBase<T>::freeItem(item);
+}
+
+template <typename T>
+bool MultiChannel<T>::arbit() const
+{
+  bool choiceValid = false;
+  sim::Id choiceId = 0;
+  sim::Id choicePrio = 0;
+  for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+    sim::Id id = it->first;
+    const ChannelContext<T> & ctx = it->second;
+    if (ctx.head) {
+      sim::Id prio = ChannelBase<T>::is(ChannelFairArbit)? it->first - m_curId - 1 : it->first;
+      if (!choiceValid || prio < choicePrio) {
+        choiceValid = true;
+        choiceId = id;
+        choicePrio = prio;
+      }
+    }
+  }
+  if (choiceValid) {
+    m_curId = choiceId;
+  }
+  return choiceValid;
+}
+
+
+//-----------------------------------------------------------------------------
+
+
+
+// template <typename T>
+// void MultiChannel<T>::tick()
+// {
+//   ++m_timestamp;
+//   if (m_pushEnable && m_pushTimeout > 0) --m_pushTimeout;
+//   if (m_takeEnable && m_takeTimeout > 0) --m_takeTimeout;
+
+//   // if (!m_head) {
+//   //   m_head = select();
+//   // }
+//   // for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+//   //   ChannelContext<T> & ctx = it->second;
+//   //   if (!ctx.head) {
+//   //     ctx.head = selectId(ctx.items);
+//   //     // TODO-lw m_headCallback(id, last);
+//   //   }
+//   // }
+// }
+
+// template <typename T>
+// inline bool Channel<T>::free() const
+// {
+//   return m_pushTimeout == 0 && (m_depth == 0 || m_itemCount < m_depth);
+// }
+
+// template <typename T>
+// bool Channel<T>::push(T && item, sim::Delay delay)
+// {
+//   if (!free()) {
+//     return false;
+//   }
+
+//   ChannelItem<T> * it = allocItem();
+//   it->item = std::move(item);
+//   it->blockUntil = delay;
+//   pushItem(it);
+//   return true;
+// }
+
+// template <typename T>
+// bool Channel<T>::push(const T & item, sim::Delay delay)
+// {
+//   if (!free()) {
+//     return false;
+//   }
+
+//   ChannelItem<T> * it = allocItem();
+//   it->item = item;
+//   it->blockUntil = delay;
+//   pushItem(it);
+//   return true;
+// }
+
+
+// template <typename T>
+// const T * Channel<T>::headId(sim::Id id)
+// {
+//   ChannelContext<T> & ctx = m_perId[id];
+//   if (m_takeTimeout > 0 || !ctx.head) {
+//     return nullptr;
+//   }
+
+//   return &(ctx.head->item);
+// }
+
+// template <typename T>
+// std::optional<T> Channel<T>::takeId(sim::Id id)
+// {
+//   ChannelContext<T> & ctx = m_perId[id];
+//   if (m_takeTimeout > 0 || !ctx.head) {
+//     return std::nullopt;
+//   }
+
+//   ChannelItem<T> * it = ctx.head;
+//   takeItem(it, ctx);
+//   return std::move(it->item);
+// }
+
+// template <typename T>
+// const T * Channel<T>::headArbit()
+// {
+//   if (!m_latchId) {
+//     m_latchId = arbit(); // latch (new) m_curId if arbit() succeeds
+//   }
+
+//   ChannelContext<T> & ctx = m_perId[m_curId];
+//   if (m_takeTimeout > 0 || !ctx.head) {
+//     // TODO-lw maybe reset m_latchId to avoid unnecessary blocking on concurrent takeId or takeOrder
+//     return nullptr;
+//   }
+
+//   return &(ctx.head->item);
+// }
+
+// template <typename T>
+// std::optional<T> Channel<T>::takeArbit()
+// {
+//   if (!m_latchId) {
+//     m_latchId = arbit(); // latch (new) m_curId if arbit() succeeds
+//   }
+
+//   ChannelContext<T> & ctx = m_perId[m_curId];
+//   if (m_takeTimeout > 0 || !ctx.head) {
+//     // TODO-lw maybe reset m_latchId to avoid unnecessary blocking on concurrent takeId or takeOrder
+//     return std::nullopt;
+//   }
+
+//   ChannelItem<T> * it = ctx.head;
+//   takeItem(it, ctx);
+//   if (!isPackArbit() || it->last()) {
+//     m_latchId = false; // rearbit on either any beat or only last beat in packet
+//   }
+//   return std::move(it->item);
+// }
+// 
+
+// template <typename T>
+// const T * Channel<T>::headOrder()
+// {
+//   if (m_takeTimeout > 0 || !m_head) {
+//     return nullptr;
+//   }
+
+//   return &(m_head->item);
+// }
+
+// template <typename T>
+// std::optional<T> Channel<T>::takeOrder()
+// {
+//   if (m_takeTimeout > 0 || !m_head) {
+//     return std::nullopt;
+//   }
+
+//   ChannelItem<T> * it = m_head;
+//   ChannelContext<T> & ctx = m_perId[it->id()];
+//   takeItem(it, ctx);
+//   return std::move(it->item);
+// }
+
+// template <typename T>
+// bool Channel<T>::arbit() const
+// {
+//   bool choiceValid = false;
+//   sim::Id choiceId = 0;
+//   sim::Id choicePrio = 0;
+//   for (auto it = m_perId.begin(); it != m_perId.end(); ++it) {
+//     sim::Id id = it->first;
+//     const ChannelContext<T> & ctx = it->second;
+//     if (ctx.head) {
+//       sim::Id prio = isFairArbit()? it->first - m_curId - 1 : it->first;
+//       if (!choiceValid || prio < choicePrio) {
+//         choiceValid = true;
+//         choiceId = id;
+//         choicePrio = prio;
+//       }
+//     }
+//   }
+//   if (choiceValid) {
+//     m_curId = choiceId;
+//   }
+//   return choiceValid;
+// }
+
+// template <typename T>
+// ChannelItem<T> * Channel<T>::selectId(ChannelList<T> & items)
+// {
+//   for (ChannelItem<T> * it = items.front; it; it = it->idNext) {
+//     if (!it->blocked(m_timestamp)) {
+//       return it;
+//     } else if (!isUnordered()) {
+//       break;
+//     }
+//   }
+//   return nullptr;
+// }
+
+
+// // template <typename T>
+// // inline bool Channel<T>::isTakeNoblock() const
+// // {
+// //   return m_flags & ChannelTakeNoblock;
+// // }
+
+// // template <typename T>
+// // inline bool Channel<T>::isUnordered() const
+// // {
+// //   return m_flags & ChannelUnordered;
+// // }
+
+// // template <typename T>
+// // inline bool Channel<T>::isFairArbit() const
+// // {
+// //   return m_flags & ChannelFairArbit;
+// // }
+
+// // template <typename T>
+// // inline bool Channel<T>::isPackArbit() const
+// // {
+// //   return m_flags & ChannelPackArbit;
+// // }
+}; // namespace sim
