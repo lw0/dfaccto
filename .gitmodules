@@ -2,3 +2,6 @@
 	path = sub/dfaccto_tpl
 	url = https://github.com/lw0/dfaccto_tpl
 	branch = main
+[submodule "sub/dfaccto_lib"]
+	path = sub/dfaccto_lib
+	url = https://github.com/lw0/dfaccto_lib/
