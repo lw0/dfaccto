@@ -1,7 +1,4 @@
-/.venv/
 /build/
-/hw/gen/
-/hw/sources.lst
 /wave/
 /sw/stash/
 .ccls-cache/

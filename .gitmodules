@@ -1,7 +1,15 @@
 [submodule "sub/dfaccto_tpl"]
 	path = sub/dfaccto_tpl
-	url = https://github.com/lw0/dfaccto_tpl
+	url = https://github.com/lw0/dfaccto_tpl/
 	branch = main
+
 [submodule "sub/dfaccto_lib"]
 	path = sub/dfaccto_lib
 	url = https://github.com/lw0/dfaccto_lib/
+	branch = main
+
+[submodule "sub/dfaccto_sim"]
+	path = sub/dfaccto_sim
+	url = https://github.com/lw0/dfaccto_sim/
+	branch = main
+
