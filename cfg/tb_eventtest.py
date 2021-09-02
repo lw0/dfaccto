@@ -12,7 +12,7 @@ with EntTestbench(
   SimPort.Push('evtB',   T('ByteEvent')),
   SimPort.Pull('evtC',   T('ByteEvent'))):
 
-  Ins('EventTest', None,
+  Ins('EventTestIMap', None,
     MapPort('sys',  S('sys')),
     MapPort('valA', S('valA')),
     MapPort('valB', S('valB')),
