@@ -4,15 +4,15 @@ Inc('axitest.py')
 
 
 with EntTestbench(
-  SimPort.Sys('sys',     T('Sys')),
-  SimPort.Pull('intr',   T('IntrEvent')),
-  SimPort.Master('ctrl', T('CtrlAxi')),
-  SimPort.Slave('mem',   T('MemAxiExt'))):
+  SimPort.Sys('sys',     Util.tsys),
+  SimPort.Pull('intr',   OCAccel.tIntr),
+  SimPort.Master('ctrl', OCAccel.tCtrl),
+  SimPort.Slave('host',  OCAccel.tHost)):
 
   Ins('AxiTest', None,
     MapPort('sys',  S('sys')),
     MapPort('intr', S('intr')),
     MapPort('ctrl', S('ctrl')),
-    MapPort('mem',  S('mem')))
+    MapPort('host', S('host')))
 
 

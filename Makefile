@@ -1,6 +1,12 @@
-SYN_CONFIG = axitest.py
+SYN_CONFIG = hw_axitest.py
 SIM_CONFIG = tb_axitest.py
 SIM_SCRIPT = $(realpath ./tb/axitest.lua)
+# SYN_CONFIG = streamtest.py
+# SIM_CONFIG = tb_streamtest.py
+# SIM_SCRIPT = $(realpath ./tb/streamtest.lua)
+# SYN_CONFIG = eventtest.py
+# SIM_CONFIG = tb_eventtest.py
+# SIM_SCRIPT = $(realpath ./tb/eventtest.lua)
 
 # Directories
 BUILD_DIR = $(abspath ./build)
